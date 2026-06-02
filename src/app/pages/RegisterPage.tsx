@@ -1,17 +1,62 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { useAuth } from '../components/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { CheckCircle2 } from 'lucide-react';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { CheckCircle2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const userType = searchParams.get('type') === 'seller' ? 'seller' : 'buyer';
   const [step, setStep] = useState(1);
+  const { register } = useAuth();
 
-  const handleComplete = () => {
-    navigate('/verify-identity');
+  // Datos del formulario centralizados
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirm_password: '',
+    address: '',
+    city: '',
+    business_name: '',
+  });
+
+  const update = (field: string, value: string) =>
+    setFormData(prev => ({ ...prev, [field]: value }));
+
+  const handleComplete = async () => {
+    if (formData.password !== formData.confirm_password) {
+      toast.error('Las contraseñas no coinciden');
+      return;
+    }
+    if (formData.password.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    try {
+      await register({
+        email: formData.email,
+        password: formData.password,
+        full_name: formData.full_name,
+        user_type: userType,
+        phone: formData.phone,
+      });
+      toast.success('Cuenta creada. Revisa tu correo para confirmarla.');
+      navigate('/verify-identity');
+    } catch (err: any) {
+      const msg = err?.message || 'Error al registrarse';
+      if (msg.includes('already registered')) {
+        toast.error('Este correo ya está registrado');
+      } else {
+        toast.error(msg);
+      }
+    }
   };
 
   return (
@@ -32,95 +77,110 @@ export function RegisterPage() {
             <div className="flex justify-between mt-2 text-sm text-gray-600">
               <span>Datos básicos</span>
               <span>Información</span>
-              <span>Verificación</span>
+              <span>Contraseña</span>
             </div>
           </div>
 
-          {step === 1 && <Step1 onNext={() => setStep(2)} />}
-          {step === 2 && <Step2 onNext={() => setStep(3)} userType={userType} />}
-          {step === 3 && <Step3 onComplete={handleComplete} />}
+          {step === 1 && (
+            <Step1
+              data={formData}
+              onChange={update}
+              onNext={() => {
+                if (!formData.full_name || !formData.email) {
+                  toast.error('Completa nombre y correo');
+                  return;
+                }
+                setStep(2);
+              }}
+            />
+          )}
+          {step === 2 && (
+            <Step2
+              data={formData}
+              onChange={update}
+              userType={userType}
+              onNext={() => setStep(3)}
+            />
+          )}
+          {step === 3 && (
+            <Step3
+              data={formData}
+              onChange={update}
+              onComplete={handleComplete}
+            />
+          )}
         </Card>
       </div>
     </div>
   );
 }
 
-function Step1({ onNext }: { onNext: () => void }) {
+function Step1({ data, onChange, onNext }: any) {
   return (
     <div className="space-y-4">
       <h3 className="font-semibold mb-4">Información Personal</h3>
       <div>
-        <label className="block text-sm font-medium mb-2">Nombre Completo</label>
-        <input type="text" className="w-full px-3 py-2 border rounded-md" placeholder="Juan Pérez" />
+        <Label>Nombre Completo</Label>
+        <Input value={data.full_name} onChange={e => onChange('full_name', e.target.value)} placeholder="Juan Pérez" />
       </div>
       <div>
-        <label className="block text-sm font-medium mb-2">Correo Electrónico</label>
-        <input type="email" className="w-full px-3 py-2 border rounded-md" placeholder="juan@ejemplo.com" />
+        <Label>Correo Electrónico</Label>
+        <Input type="email" value={data.email} onChange={e => onChange('email', e.target.value)} placeholder="juan@ejemplo.com" />
       </div>
       <div>
-        <label className="block text-sm font-medium mb-2">Teléfono</label>
-        <input type="tel" className="w-full px-3 py-2 border rounded-md" placeholder="+1 234 567 8900" />
+        <Label>Teléfono</Label>
+        <Input type="tel" value={data.phone} onChange={e => onChange('phone', e.target.value)} placeholder="+1 234 567 8900" />
       </div>
       <Button onClick={onNext} className="w-full mt-4">Continuar</Button>
     </div>
   );
 }
 
-function Step2({ onNext, userType }: { onNext: () => void; userType: string }) {
+function Step2({ data, onChange, userType, onNext }: any) {
   return (
     <div className="space-y-4">
       <h3 className="font-semibold mb-4">
         {userType === 'seller' ? 'Información del Negocio' : 'Dirección de Entrega'}
       </h3>
-      {userType === 'seller' ? (
-        <>
-          <div>
-            <label className="block text-sm font-medium mb-2">Nombre del Negocio</label>
-            <input type="text" className="w-full px-3 py-2 border rounded-md" placeholder="Mi Tienda" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Categoría Principal</label>
-            <select className="w-full px-3 py-2 border rounded-md">
-              <option>Electrónica</option>
-              <option>Ropa y Moda</option>
-              <option>Hogar y Jardín</option>
-              <option>Deportes</option>
-            </select>
-          </div>
-        </>
-      ) : (
-        <>
-          <div>
-            <label className="block text-sm font-medium mb-2">Dirección</label>
-            <input type="text" className="w-full px-3 py-2 border rounded-md" placeholder="Calle Principal 123" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Ciudad</label>
-              <input type="text" className="w-full px-3 py-2 border rounded-md" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Código Postal</label>
-              <input type="text" className="w-full px-3 py-2 border rounded-md" />
-            </div>
-          </div>
-        </>
+      <div>
+        <Label>Dirección</Label>
+        <Input value={data.address} onChange={e => onChange('address', e.target.value)} placeholder="Calle Principal 123" />
+      </div>
+      <div>
+        <Label>Ciudad</Label>
+        <Input value={data.city} onChange={e => onChange('city', e.target.value)} placeholder="San José" />
+      </div>
+      {userType === 'seller' && (
+        <div>
+          <Label>Nombre del Negocio (opcional)</Label>
+          <Input value={data.business_name} onChange={e => onChange('business_name', e.target.value)} placeholder="Mi Tienda" />
+        </div>
       )}
       <Button onClick={onNext} className="w-full mt-4">Continuar</Button>
     </div>
   );
 }
 
-function Step3({ onComplete }: { onComplete: () => void }) {
+function Step3({ data, onChange, onComplete }: any) {
+  const [loading, setLoading] = useState(false);
+  const handle = async () => {
+    setLoading(true);
+    await onComplete();
+    setLoading(false);
+  };
   return (
-    <div className="text-center py-8">
-      <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto mb-4" />
-      <h3 className="font-semibold text-xl mb-2">Registro Completado</h3>
-      <p className="text-gray-600 mb-6">
-        Ahora necesitamos verificar tu identidad para garantizar la seguridad de la plataforma
-      </p>
-      <Button onClick={onComplete} className="w-full">
-        Continuar a Verificación de Identidad
+    <div className="space-y-4">
+      <h3 className="font-semibold mb-4">Crea tu Contraseña</h3>
+      <div>
+        <Label>Contraseña</Label>
+        <Input type="password" value={data.password} onChange={e => onChange('password', e.target.value)} placeholder="Mínimo 6 caracteres" />
+      </div>
+      <div>
+        <Label>Confirmar Contraseña</Label>
+        <Input type="password" value={data.confirm_password} onChange={e => onChange('confirm_password', e.target.value)} placeholder="Repite la contraseña" />
+      </div>
+      <Button onClick={handle} className="w-full mt-4" disabled={loading}>
+        {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creando cuenta...</> : 'Crear Cuenta'}
       </Button>
     </div>
   );

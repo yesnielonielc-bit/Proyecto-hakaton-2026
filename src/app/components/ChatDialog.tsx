@@ -3,18 +3,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
-import { Send, MessageCircle } from 'lucide-react';
+import { Send, MessageCircle, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { supabase } from '@/lib/supabase';
 
 interface Message {
   id: string;
-  conversationId: string;
-  senderId: string;
-  senderName: string;
-  message: string;
-  timestamp: number;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  profiles: { full_name: string };
 }
 
 interface ChatDialogProps {
@@ -29,81 +30,116 @@ export function ChatDialog({ open, onClose, otherUserId, otherUserName }: ChatDi
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const conversationId = [user?.id, otherUserId].sort().join(':');
+  // Obtener o crear conversación
+  const getOrCreateConversation = async () => {
+    if (!user) return null;
 
-  const fetchMessages = async () => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-7b39351d/chat/messages?conversationId=${conversationId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-        }
-      );
+    // Buscar conversación existente entre estos dos usuarios
+    const { data: existing } = await supabase
+      .from('conversations')
+      .select('id')
+      .or(`and(buyer_id.eq.${user.id},seller_id.eq.${otherUserId}),and(buyer_id.eq.${otherUserId},seller_id.eq.${user.id})`)
+      .limit(1)
+      .single();
 
-      const data = await response.json();
+    if (existing) return existing.id;
 
-      if (data.messages) {
-        setMessages(data.messages);
-      }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
+    // Crear nueva conversación
+    const { data: created, error } = await supabase
+      .from('conversations')
+      .insert({ buyer_id: user.id, seller_id: otherUserId })
+      .select('id')
+      .single();
+
+    if (error) { toast.error('Error al iniciar conversación'); return null; }
+    return created.id;
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !user) return;
+  const fetchMessages = async (convId: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, profiles(full_name)')
+      .eq('conversation_id', convId)
+      .order('created_at', { ascending: true });
 
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-7b39351d/chat/send`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({
-            conversationId,
-            senderId: user.id,
-            senderName: user.name,
-            message: newMessage,
-          }),
-        }
-      );
+    if (error) { console.error(error); return; }
+    setMessages(data || []);
 
-      const data = await response.json();
-
-      if (data.error) {
-        toast.error(data.error);
-        return;
-      }
-
-      setMessages([...messages, data]);
-      setNewMessage('');
-
-      setTimeout(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Error al enviar mensaje');
-    } finally {
-      setLoading(false);
-    }
+    // Marcar mensajes como leídos
+    await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('conversation_id', convId)
+      .neq('sender_id', user?.id);
   };
 
   useEffect(() => {
-    if (open) {
-      fetchMessages();
-      const interval = setInterval(fetchMessages, 3000);
-      return () => clearInterval(interval);
+    if (!open || !user) return;
+
+    let channel: any;
+
+    const init = async () => {
+      const convId = await getOrCreateConversation();
+      if (!convId) return;
+      setConversationId(convId);
+      await fetchMessages(convId);
+
+      // Suscribirse a mensajes nuevos en tiempo real
+      channel = supabase
+        .channel(`messages:${convId}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${convId}`,
+        }, async (payload) => {
+          // Obtener datos completos del mensaje nuevo
+          const { data } = await supabase
+            .from('messages')
+            .select('*, profiles(full_name)')
+            .eq('id', payload.new.id)
+            .single();
+          if (data) {
+            setMessages(prev => [...prev, data]);
+            setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+          }
+        })
+        .subscribe();
+    };
+
+    init();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [open, user, otherUserId]);
+
+  useEffect(() => {
+    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !user || !conversationId || loading) return;
+
+    setLoading(true);
+    const content = newMessage.trim();
+    setNewMessage('');
+
+    const { error } = await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content,
+    });
+
+    if (error) {
+      toast.error('Error al enviar mensaje');
+      setNewMessage(content);
     }
-  }, [open, conversationId]);
+    setLoading(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -125,34 +161,18 @@ export function ChatDialog({ open, onClose, otherUserId, otherUserName }: ChatDi
               </div>
             ) : (
               messages.map((msg) => {
-                const isOwn = msg.senderId === user?.id;
+                const isOwn = msg.sender_id === user?.id;
                 return (
-                  <div
-                    key={msg.id}
-                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[70%] rounded-lg p-3 ${
-                        isOwn
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-900'
-                      }`}
-                    >
+                  <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[70%] rounded-lg p-3 ${isOwn ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
                       {!isOwn && (
                         <p className="text-xs font-semibold mb-1 opacity-70">
-                          {msg.senderName}
+                          {msg.profiles?.full_name}
                         </p>
                       )}
-                      <p className="text-sm">{msg.message}</p>
-                      <p
-                        className={`text-xs mt-1 ${
-                          isOwn ? 'text-blue-100' : 'text-gray-500'
-                        }`}
-                      >
-                        {new Date(msg.timestamp).toLocaleTimeString('es', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                      <p className="text-sm">{msg.content}</p>
+                      <p className={`text-xs mt-1 ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>
+                        {new Date(msg.created_at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
                   </div>
@@ -167,12 +187,12 @@ export function ChatDialog({ open, onClose, otherUserId, otherUserName }: ChatDi
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
             placeholder="Escribe un mensaje..."
             disabled={loading}
           />
           <Button onClick={sendMessage} disabled={loading || !newMessage.trim()}>
-            <Send className="h-4 w-4" />
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
       </DialogContent>

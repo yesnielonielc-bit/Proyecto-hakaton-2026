@@ -5,12 +5,15 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card } from '../components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { login, profile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const defaultType = searchParams.get('type') === 'seller' ? 'seller' : 'buyer';
@@ -18,8 +21,27 @@ export function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await login(email, password, userType);
-    navigate(userType === 'seller' ? '/seller/inventory' : '/marketplace');
+    if (loading) return;
+    setLoading(true);
+    try {
+      await login(email, password);
+      // El perfil se carga en AuthContext, esperamos un momento
+      toast.success('¡Bienvenido de vuelta!');
+      // Redirigir según el tipo de usuario del perfil
+      const type = profile?.user_type ?? userType;
+      navigate(type === 'seller' ? '/seller/inventory' : '/marketplace');
+    } catch (err: any) {
+      const msg = err?.message || 'Error al iniciar sesión';
+      if (msg.includes('Invalid login credentials')) {
+        toast.error('Correo o contraseña incorrectos');
+      } else if (msg.includes('Email not confirmed')) {
+        toast.error('Confirma tu correo electrónico primero');
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -43,6 +65,7 @@ export function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
           <div>
@@ -53,10 +76,11 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
-          <Button type="submit" className="w-full">
-            Ingresar
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Ingresando...</> : 'Ingresar'}
           </Button>
         </form>
 
