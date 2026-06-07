@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
-import { Plus, Package, TrendingUp, DollarSign, Eye, Edit, Trash2, Loader2 } from 'lucide-react';
+import {
+  Plus, Package, TrendingUp, DollarSign, Eye, Edit, Trash2, Loader2,
+  LayoutDashboard, ShoppingBag, Users, MessageCircle, BarChart2,
+  Settings, Bell, ChevronDown, LogOut, ShoppingCart, Menu
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '../components/AuthContext';
@@ -26,10 +31,24 @@ interface Product {
   product_images: { url: string }[];
 }
 
+const navItems = [
+  { to: '/seller/inventory', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/seller/inventory', icon: Package, label: 'Inventario', exact: true },
+  { to: '/seller/orders', icon: ShoppingBag, label: 'Pedidos' },
+  { to: '/seller/sales', icon: TrendingUp, label: 'Ventas' },
+  { to: '/seller/customers', icon: Users, label: 'Clientes' },
+  { to: '/messages', icon: MessageCircle, label: 'Mensajes' },
+  { to: '/seller/reports', icon: BarChart2, label: 'Reportes' },
+  { to: '/seller/settings', icon: Settings, label: 'Configuración' },
+];
+
 export function SellerInventoryPage() {
-  const { user } = useAuth();
+  const { user, profile, logout } = useAuth();
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const fetchProducts = async () => {
     if (!user) return;
@@ -46,16 +65,29 @@ export function SellerInventoryPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchProducts(); }, [user]);
+  useEffect(() => {
+    fetchProducts();
+    const channel = supabase
+      .channel('seller-products')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'products',
+      }, (payload) => {
+        setProducts(prev => prev.map(p =>
+          p.id === payload.new.id ? { ...p, view_count: payload.new.view_count } : p
+        ));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   const totalValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
   const totalSales = products.reduce((sum, p) => sum + (p.sales_count || 0), 0);
+  const totalViews = products.reduce((sum, p) => sum + (p.view_count || 0), 0);
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from('products')
-      .update({ status: 'deleted' })
-      .eq('id', id);
+    const { error } = await supabase.from('products').update({ status: 'deleted' }).eq('id', id);
     if (error) { toast.error('Error al eliminar'); return; }
     setProducts(prev => prev.filter(p => p.id !== id));
     toast.success('Producto eliminado');
@@ -63,130 +95,268 @@ export function SellerInventoryPage() {
 
   const handleToggleStatus = async (product: Product) => {
     const newStatus = product.status === 'active' ? 'paused' : 'active';
-    const { error } = await supabase
-      .from('products').update({ status: newStatus }).eq('id', product.id);
+    const { error } = await supabase.from('products').update({ status: newStatus }).eq('id', product.id);
     if (error) { toast.error('Error al actualizar'); return; }
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: newStatus } : p));
     toast.success(newStatus === 'active' ? 'Producto activado' : 'Producto pausado');
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   const getImage = (p: Product) =>
     p.product_images?.[0]?.url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400';
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Mi Inventario</h1>
-            <p className="text-gray-600 mt-1">Gestiona tus productos y ventas</p>
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+
+      {/* ── Sidebar ── */}
+      <aside className={`flex flex-col bg-white border-r border-gray-100 shadow-sm transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-60'}`}>
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-4 py-5 border-b border-gray-100">
+          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <ShoppingCart className="h-5 w-5 text-white" />
           </div>
-          <AddProductDialog sellerId={user?.id || ''} onAdded={fetchProducts} />
+          {!sidebarCollapsed && <span className="font-bold text-blue-600 text-lg tracking-tight">MarketSecure</span>}
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Productos</p>
-                <p className="text-2xl font-bold mt-1">{products.length}</p>
-              </div>
-              <Package className="h-12 w-12 text-blue-600 opacity-20" />
-            </div>
-          </Card>
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Valor Inventario</p>
-                <p className="text-2xl font-bold mt-1">${totalValue.toFixed(2)}</p>
-              </div>
-              <DollarSign className="h-12 w-12 text-green-600 opacity-20" />
-            </div>
-          </Card>
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Ventas Totales</p>
-                <p className="text-2xl font-bold mt-1">{totalSales}</p>
-              </div>
-              <TrendingUp className="h-12 w-12 text-purple-600 opacity-20" />
-            </div>
-          </Card>
-        </div>
+        {/* Nav items */}
+        <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
+          {navItems.map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={label}
+              to={to}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  isActive && label === 'Inventario'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                }`
+              }
+            >
+              <Icon className="h-5 w-5 flex-shrink-0" />
+              {!sidebarCollapsed && <span>{label}</span>}
+            </NavLink>
+          ))}
+        </nav>
 
-        <Card>
-          <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Productos en Inventario</h2>
-            {products.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p>Aún no tienes productos. ¡Agrega el primero!</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4">Producto</th>
-                      <th className="text-left py-3 px-4">Categoría</th>
-                      <th className="text-left py-3 px-4">Precio</th>
-                      <th className="text-left py-3 px-4">Stock</th>
-                      <th className="text-left py-3 px-4">Estado</th>
-                      <th className="text-left py-3 px-4">Vistas</th>
-                      <th className="text-left py-3 px-4">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products.map(product => (
-                      <tr key={product.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <img src={getImage(product)} alt={product.name} className="w-12 h-12 object-cover rounded" />
-                            <span className="font-medium">{product.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4"><Badge variant="secondary">{product.category}</Badge></td>
-                        <td className="py-3 px-4 font-semibold">${product.price}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={product.stock < 5 ? 'destructive' : 'default'}>
-                            {product.stock} uds.
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
-                            {product.status === 'active' ? 'Activo' : 'Pausado'}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1 text-gray-600">
-                            <Eye className="h-4 w-4" />{product.view_count || 0}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(product)}
-                              title={product.status === 'active' ? 'Pausar' : 'Activar'}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(product.id)}>
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        {/* Profile */}
+        <div className="border-t border-gray-100 p-3">
+          <button
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="flex items-center gap-3 w-full px-2 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-blue-600 font-semibold text-sm">
+                {profile?.full_name?.charAt(0).toUpperCase() || 'V'}
+              </span>
+            </div>
+            {!sidebarCollapsed && (
+              <>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{profile?.full_name || 'Vendedor'}</p>
+                  <p className="text-xs text-gray-400">Ver perfil</p>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+              </>
             )}
+          </button>
+          {profileOpen && !sidebarCollapsed && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 w-full px-3 py-2 mt-1 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+            >
+              <LogOut className="h-4 w-4" /> Cerrar sesión
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* ── Main ── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+
+        {/* Top bar */}
+        <header className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between flex-shrink-0">
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <Menu className="h-5 w-5 text-gray-600" />
+          </button>
+          <div className="flex items-center gap-3">
+            <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
+              <Bell className="h-5 w-5 text-gray-600" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full" />
+            </button>
+            <NavLink
+              to="/marketplace"
+              className="text-sm text-blue-600 font-medium px-4 py-2 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors"
+            >
+              Ver Marketplace
+            </NavLink>
           </div>
-        </Card>
+        </header>
+
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+          ) : (
+            <>
+              {/* Header */}
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Mi Inventario</h1>
+                  <p className="text-gray-500 text-sm mt-0.5">Gestiona tus productos y ventas</p>
+                </div>
+                <AddProductDialog sellerId={user?.id || ''} onAdded={fetchProducts} />
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <Card className="p-5 border-0 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Total Productos</p>
+                      <p className="text-2xl font-bold text-gray-900">{products.length}</p>
+                      <p className="text-xs text-gray-400 mt-1">Productos registrados</p>
+                    </div>
+                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
+                      <Package className="h-6 w-6 text-blue-500" />
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-5 border-0 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Valor Inventario</p>
+                      <p className="text-2xl font-bold text-gray-900">${totalValue.toFixed(2)}</p>
+                      <p className="text-xs text-gray-400 mt-1">Valor total en inventario</p>
+                    </div>
+                    <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center">
+                      <DollarSign className="h-6 w-6 text-green-500" />
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-5 border-0 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Ventas Totales</p>
+                      <p className="text-2xl font-bold text-gray-900">{totalSales}</p>
+                      <p className="text-xs text-gray-400 mt-1">Ventas realizadas</p>
+                    </div>
+                    <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6 text-purple-500" />
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-5 border-0 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Vistas Totales</p>
+                      <p className="text-2xl font-bold text-gray-900">{totalViews}</p>
+                      <p className="text-xs text-gray-400 mt-1">Visitas a productos</p>
+                    </div>
+                    <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center">
+                      <Eye className="h-6 w-6 text-orange-500" />
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Table */}
+              <Card className="border-0 shadow-sm">
+                <div className="p-6">
+                  <h2 className="text-base font-semibold text-gray-900 mb-4">Productos en Inventario</h2>
+                  {products.length === 0 ? (
+                    <div className="text-center py-16 text-gray-400">
+                      <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <Package className="h-8 w-8 text-blue-300" />
+                      </div>
+                      <p className="font-medium text-gray-500">Aún no tienes productos</p>
+                      <p className="text-sm mt-1">¡Agrega el primero y comienza a vender!</p>
+                      <AddProductDialog sellerId={user?.id || ''} onAdded={fetchProducts} />
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Producto</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Categoría</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Precio</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Stock</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Vistas</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {products.map(product => (
+                            <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  <img src={getImage(product)} alt={product.name} className="w-10 h-10 object-cover rounded-lg" />
+                                  <span className="font-medium text-sm text-gray-800">{product.name}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <Badge variant="secondary" className="text-xs">{product.category}</Badge>
+                              </td>
+                              <td className="py-3 px-4 font-semibold text-sm text-gray-800">${product.price}</td>
+                              <td className="py-3 px-4">
+                                <Badge variant={product.stock < 5 ? 'destructive' : 'default'} className="text-xs">
+                                  {product.stock} uds.
+                                </Badge>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
+                                  product.status === 'active'
+                                    ? 'bg-green-50 text-green-700'
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${product.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                  {product.status === 'active' ? 'Activo' : 'Pausado'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                                  <Eye className="h-4 w-4" />
+                                  <span>{product.view_count || 0}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex gap-1">
+                                  <Button variant="ghost" size="sm"
+                                    onClick={() => handleToggleStatus(product)}
+                                    title={product.status === 'active' ? 'Pausar' : 'Activar'}
+                                    className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm"
+                                    onClick={() => handleDelete(product.id)}
+                                    className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </>
+          )}
+        </main>
       </div>
     </div>
   );
@@ -246,7 +416,9 @@ function AddProductDialog({ sellerId, onAdded }: { sellerId: string; onAdded: ()
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button><Plus className="mr-2 h-4 w-4" />Agregar Producto</Button>
+        <Button className="bg-blue-600 hover:bg-blue-700">
+          <Plus className="mr-2 h-4 w-4" />Agregar Producto
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Nuevo Producto</DialogTitle></DialogHeader>
@@ -262,7 +434,7 @@ function AddProductDialog({ sellerId, onAdded }: { sellerId: string; onAdded: ()
           <div>
             <Label>Categoría</Label>
             <select value={formData.category} onChange={e => update('category', e.target.value)}
-              className="w-full px-3 py-2 border rounded-md" required>
+              className="w-full px-3 py-2 border rounded-md text-sm" required>
               <option value="">Seleccionar categoría</option>
               <option value="Electrónica">Electrónica</option>
               <option value="Ropa">Ropa</option>
@@ -276,7 +448,7 @@ function AddProductDialog({ sellerId, onAdded }: { sellerId: string; onAdded: ()
           <div>
             <Label>Condición</Label>
             <select value={formData.condition} onChange={e => update('condition', e.target.value)}
-              className="w-full px-3 py-2 border rounded-md">
+              className="w-full px-3 py-2 border rounded-md text-sm">
               <option value="new">Nuevo</option>
               <option value="like_new">Como nuevo</option>
               <option value="good">Buen estado</option>

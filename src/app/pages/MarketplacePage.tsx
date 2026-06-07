@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -11,6 +12,7 @@ import { useAuth } from '../components/AuthContext';
 import { CheckoutDialog } from '../components/CheckoutDialog';
 import { ChatDialog } from '../components/ChatDialog';
 import { DeliveryMap } from '../components/DeliveryMap';
+import { ReviewDialog } from '../components/ReviewDialog';
 
 interface Product {
   id: string;
@@ -46,6 +48,7 @@ export function MarketplacePage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatUser, setChatUser] = useState<{ id: string; name: string } | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [reviewSeller, setReviewSeller] = useState<{ id: string; name: string } | null>(null);
 
   const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))];
 
@@ -77,7 +80,7 @@ export function MarketplacePage() {
       .from('favorites')
       .select('product_id')
       .eq('user_id', user.id);
-    if (data) setFavorites(new Set(data.map(f => f.product_id)));
+    if (data) setFavorites(new Set(data.map((f: { product_id: string }) => f.product_id)));
   };
 
   useEffect(() => {
@@ -88,7 +91,6 @@ export function MarketplacePage() {
   const toggleFavorite = async (e: React.MouseEvent, productId: string) => {
     e.stopPropagation();
     if (!user) { toast.error('Inicia sesión para guardar favoritos'); return; }
-
     if (favorites.has(productId)) {
       await supabase.from('favorites').delete()
         .eq('user_id', user.id).eq('product_id', productId);
@@ -101,7 +103,6 @@ export function MarketplacePage() {
 
   const handleOpenProduct = async (product: Product) => {
     setSelectedProduct(product);
-    // Incrementar contador de vistas
     await supabase.from('products')
       .update({ view_count: (product.view_count || 0) + 1 })
       .eq('id', product.id);
@@ -221,6 +222,7 @@ export function MarketplacePage() {
         )}
       </div>
 
+      {/* Dialog detalle del producto */}
       {selectedProduct && (
         <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -240,11 +242,22 @@ export function MarketplacePage() {
               <div className="space-y-4">
                 <Badge variant="secondary">{selectedProduct.category}</Badge>
                 <p className="text-gray-600">{selectedProduct.description}</p>
-                <div className="flex items-center gap-2">
+
+                {/* Rating clickeable → abre reseñas */}
+                <button
+                  onClick={() => setReviewSeller({
+                    id: selectedProduct.seller_id,
+                    name: selectedProduct.profiles?.full_name
+                  })}
+                  className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+                >
                   <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">{selectedProduct.profiles?.rating?.toFixed(1)}</span>
-                  <span className="text-gray-600">({selectedProduct.profiles?.review_count} reseñas)</span>
-                </div>
+                  <span className="font-semibold">{selectedProduct.profiles?.rating?.toFixed(1) || '0.0'}</span>
+                  <span className="text-gray-600 underline text-sm">
+                    ({selectedProduct.profiles?.review_count || 0} reseñas)
+                  </span>
+                </button>
+
                 <div className="border-t pt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Shield className="h-5 w-5 text-blue-600" />
@@ -283,6 +296,16 @@ export function MarketplacePage() {
 
       {chatOpen && chatUser && (
         <ChatDialog open={chatOpen} onClose={() => setChatOpen(false)} otherUserId={chatUser.id} otherUserName={chatUser.name} />
+      )}
+
+      {/* Dialog de reseñas */}
+      {reviewSeller && (
+        <ReviewDialog
+          open={!!reviewSeller}
+          onClose={() => { setReviewSeller(null); fetchProducts(); }}
+          sellerId={reviewSeller.id}
+          sellerName={reviewSeller.name}
+        />
       )}
     </div>
   );

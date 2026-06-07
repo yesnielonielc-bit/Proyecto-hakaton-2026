@@ -9,21 +9,31 @@ import { SellerInventoryPage } from './pages/SellerInventoryPage';
 import { MarketplacePage } from './pages/MarketplacePage';
 import { MessagesPage } from './pages/MessagesPage';
 import { Toaster } from './components/ui/sonner';
-
+import { Loader2 } from 'lucide-react';
+ 
 function ProtectedRoute({ children, type }: { children: React.ReactNode; type?: 'seller' | 'buyer' }) {
-  const { user } = useAuth();
-
+  const { user, profile, loading } = useAuth();
+ 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+ 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-
-  if (type && user.type !== type) {
-    return <Navigate to={user.type === 'seller' ? '/seller/inventory' : '/marketplace'} replace />;
+ 
+  // Si requiere rol específico y el perfil ya cargó
+  if (type && profile && profile.user_type !== type) {
+    return <Navigate to={profile.user_type === 'seller' ? '/seller/inventory' : '/marketplace'} replace />;
   }
-
+ 
   return <>{children}</>;
 }
-
+ 
 export default function App() {
   return (
     <BrowserRouter>
@@ -58,10 +68,11 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
         <Toaster />
       </AuthProvider>
     </BrowserRouter>
-  );
+  ); 
 }

@@ -1,17 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { MessageCircle, Send } from 'lucide-react';
+import { MessageCircle, Send, Loader2 } from 'lucide-react';
 import { useAuth } from '../components/AuthContext';
 import { ChatDialog } from '../components/ChatDialog';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { supabase } from '@/lib/supabase';
 
 interface Conversation {
-  conversationId: string;
-  lastMessage: string;
-  lastMessageTime: number;
-  otherUserId: string;
-  otherUserName: string;
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  last_message_at: string;
+  product_id: string | null;
+  last_message: string;
+  other_user: {
+    id: string;
+    full_name: string;
+  };
+  unread_count: number;
 }
 
 export function MessagesPage() {
@@ -23,46 +29,82 @@ export function MessagesPage() {
   const fetchConversations = async () => {
     if (!user) return;
 
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-7b39351d/chat/conversations?userId=${user.id}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-        }
-      );
+    // Traer conversaciones donde el usuario es comprador o vendedor
+    const { data, error } = await supabase
+      .from('conversations')
+      .select(`
+        id,
+        buyer_id,
+        seller_id,
+        last_message_at,
+        product_id,
+        buyer:profiles!conversations_buyer_id_fkey(id, full_name),
+        seller:profiles!conversations_seller_id_fkey(id, full_name),
+        messages(content, created_at, is_read, sender_id)
+      `)
+      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      .order('last_message_at', { ascending: false });
 
-      const data = await response.json();
-
-      if (data.conversations) {
-        setConversations(data.conversations);
-      }
-    } catch (error) {
+    if (error) {
       console.error('Error fetching conversations:', error);
-    } finally {
       setLoading(false);
+      return;
     }
+
+    const formatted = (data || []).map((conv: any) => {
+      const isbuyer = conv.buyer_id === user.id;
+      const otherUser = isbuyer ? conv.seller : conv.buyer;
+      const msgs = conv.messages || [];
+      const lastMsg = msgs.sort((a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+      const unread = msgs.filter((m: any) => !m.is_read && m.sender_id !== user.id).length;
+
+      return {
+        id: conv.id,
+        buyer_id: conv.buyer_id,
+        seller_id: conv.seller_id,
+        last_message_at: conv.last_message_at,
+        product_id: conv.product_id,
+        last_message: lastMsg?.content || 'Sin mensajes aún',
+        other_user: otherUser || { id: '', full_name: 'Usuario' },
+        unread_count: unread,
+      };
+    });
+
+    setConversations(formatted);
+    setLoading(false);
   };
 
   useEffect(() => {
     fetchConversations();
-    const interval = setInterval(fetchConversations, 5000);
-    return () => clearInterval(interval);
+
+    // Suscripción en tiempo real para nuevos mensajes
+    const channel = supabase
+      .channel('conversations-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+      }, () => {
+        fetchConversations();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Mensajes</h1>
           <p className="text-gray-600">Conversaciones con compradores y vendedores</p>
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <span className="animate-spin text-3xl">⏳</span>
-            <p className="text-gray-600 mt-4">Cargando conversaciones...</p>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           </div>
         ) : conversations.length === 0 ? (
           <Card className="p-12 text-center">
@@ -76,29 +118,45 @@ export function MessagesPage() {
           <div className="grid gap-4">
             {conversations.map((conv) => (
               <Card
-                key={conv.conversationId}
+                key={conv.id}
                 className="p-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => setSelectedChat({ id: conv.otherUserId, name: conv.otherUserName })}
+                onClick={() => setSelectedChat({
+                  id: conv.other_user.id,
+                  name: conv.other_user.full_name
+                })}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <MessageCircle className="h-5 w-5 text-blue-600" />
-                      <h3 className="font-semibold">{conv.otherUserName}</h3>
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-blue-600 font-semibold text-sm">
+                        {conv.other_user.full_name?.charAt(0).toUpperCase()}
+                      </span>
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-1">{conv.lastMessage}</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {new Date(conv.lastMessageTime).toLocaleString('es', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-semibold">{conv.other_user.full_name}</h3>
+                        <span className="text-xs text-gray-400">
+                          {new Date(conv.last_message_at).toLocaleString('es', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 truncate">{conv.last_message}</p>
+                    </div>
                   </div>
-                  <Button variant="ghost" size="sm">
-                    <Send className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2 ml-3">
+                    {conv.unread_count > 0 && (
+                      <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {conv.unread_count}
+                      </span>
+                    )}
+                    <Button variant="ghost" size="sm">
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -109,7 +167,10 @@ export function MessagesPage() {
       {selectedChat && (
         <ChatDialog
           open={!!selectedChat}
-          onClose={() => setSelectedChat(null)}
+          onClose={() => {
+            setSelectedChat(null);
+            fetchConversations(); // Actualizar conteo de no leídos al cerrar
+          }}
           otherUserId={selectedChat.id}
           otherUserName={selectedChat.name}
         />
