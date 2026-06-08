@@ -10,6 +10,7 @@ import { MarketplacePage } from './pages/MarketplacePage';
 import { MessagesPage } from './pages/MessagesPage';
 import { Toaster } from './components/ui/sonner';
 import { Loader2 } from 'lucide-react';
+import { ProfilePage } from './pages/ProfilePage';
  
 function ProtectedRoute({ children, type }: { children: React.ReactNode; type?: 'seller' | 'buyer' }) {
   const { user, profile, loading } = useAuth();
@@ -26,7 +27,7 @@ function ProtectedRoute({ children, type }: { children: React.ReactNode; type?: 
     return <Navigate to="/login" replace />;
   }
  
-  // Si requiere rol específico y el perfil ya cargó
+ 
   if (type && profile && profile.user_type !== type) {
     return <Navigate to={profile.user_type === 'seller' ? '/seller/inventory' : '/marketplace'} replace />;
   }
@@ -40,6 +41,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Layout />}>
+          <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route index element={<LandingPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />

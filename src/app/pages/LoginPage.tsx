@@ -15,7 +15,6 @@ export function LoginPage() {
   const defaultType = searchParams.get('type') === 'seller' ? 'seller' : 'buyer';
   const [userType, setUserType] = useState<'seller' | 'buyer'>(defaultType);
 
-  // ── Lógica sin cambios ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -40,10 +39,11 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white overflow-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-white">
 
-      {/* ── Hero superior azul ── */}
-      <div className="relative bg-gradient-to-b from-blue-50 to-white pt-10 pb-32 px-4 text-center overflow-hidden">
+      {/* ── Columna izquierda / top (hero azul claro) ── */}
+      <div className="relative bg-gradient-to-b from-blue-50 to-white lg:from-blue-50 lg:to-blue-50 lg:w-1/2 xl:w-3/5 flex flex-col items-center justify-center px-6 py-10 lg:py-0 overflow-hidden">
+
         {/* Dots decorativos */}
         <div className="absolute top-4 left-4 grid grid-cols-5 gap-1.5 opacity-20">
           {Array.from({length: 25}).map((_, i) => <div key={i} className="w-1 h-1 bg-blue-400 rounded-full" />)}
@@ -51,45 +51,49 @@ export function LoginPage() {
         <div className="absolute top-4 right-4 grid grid-cols-5 gap-1.5 opacity-20">
           {Array.from({length: 25}).map((_, i) => <div key={i} className="w-1 h-1 bg-blue-400 rounded-full" />)}
         </div>
+        <div className="absolute bottom-4 left-4 grid grid-cols-5 gap-1.5 opacity-10 hidden lg:grid">
+          {Array.from({length: 25}).map((_, i) => <div key={i} className="w-1 h-1 bg-blue-400 rounded-full" />)}
+        </div>
 
         {/* Logo */}
-        <div className="flex flex-col items-center mb-6">
+        <div className="flex flex-col items-center mb-8">
           <div className="relative mb-3">
-            <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-              <ShieldCheck className="h-10 w-10 text-white" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+              <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
             </div>
-            <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-400 rounded-full flex items-center justify-center border-2 border-white">
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 bg-blue-400 rounded-full flex items-center justify-center border-2 border-white">
               <span className="text-white text-xs">✓</span>
             </div>
           </div>
-          <h1 className="text-3xl font-black text-blue-900">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-blue-900">
             Market<span className="text-blue-500">Secure</span>
           </h1>
           <p className="text-blue-400 text-sm mt-1">Compra seguro, vende confiable</p>
         </div>
 
         {/* Selector de tipo */}
-        <div className="max-w-xs mx-auto">
-          <p className="text-lg font-bold text-gray-800 mb-1">¿Cómo quieres continuar?</p>
-          <p className="text-sm text-gray-500 mb-5">Selecciona tu perfil para personalizar tu experiencia</p>
+        <div className="w-full max-w-sm">
+          <p className="text-base sm:text-lg font-bold text-gray-800 mb-1 text-center">¿Cómo quieres continuar?</p>
+          <p className="text-xs sm:text-sm text-gray-500 mb-5 text-center">Selecciona tu perfil para personalizar tu experiencia</p>
           <div className="grid grid-cols-2 gap-3">
-            {/* Vendedor */}
             <button
               type="button"
               onClick={() => setUserType('seller')}
-              className={`relative p-4 rounded-2xl border-2 transition-all text-center ${
+              className={`relative p-4 rounded-2xl border-2 transition-all text-center bg-white ${
                 userType === 'seller'
-                  ? 'border-blue-500 bg-white shadow-md shadow-blue-100'
-                  : 'border-gray-200 bg-white hover:border-blue-200'
+                  ? 'border-blue-500 shadow-md shadow-blue-100'
+                  : 'border-gray-200 hover:border-blue-200'
               }`}
             >
-              <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-2xl">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-xl sm:text-2xl">
                 📦
               </div>
-              <p className={`font-bold text-sm ${userType === 'seller' ? 'text-blue-600' : 'text-gray-700'}`}>
+              <p className={`font-bold text-xs sm:text-sm ${userType === 'seller' ? 'text-blue-600' : 'text-gray-700'}`}>
                 Vendedor
               </p>
-              <p className="text-xs text-gray-400 mt-0.5 leading-tight">Publica tus productos y llega a más clientes</p>
+              <p className="text-xs text-gray-400 mt-0.5 leading-tight hidden sm:block">
+                Publica tus productos y llega a más clientes
+              </p>
               {userType === 'seller' && (
                 <div className="absolute bottom-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs">✓</span>
@@ -97,23 +101,24 @@ export function LoginPage() {
               )}
             </button>
 
-            {/* Comprador */}
             <button
               type="button"
               onClick={() => setUserType('buyer')}
-              className={`relative p-4 rounded-2xl border-2 transition-all text-center ${
+              className={`relative p-4 rounded-2xl border-2 transition-all text-center bg-white ${
                 userType === 'buyer'
-                  ? 'border-green-500 bg-white shadow-md shadow-green-100'
-                  : 'border-gray-200 bg-white hover:border-green-200'
+                  ? 'border-green-500 shadow-md shadow-green-100'
+                  : 'border-gray-200 hover:border-green-200'
               }`}
             >
-              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2 text-2xl">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2 text-xl sm:text-2xl">
                 🛍️
               </div>
-              <p className={`font-bold text-sm ${userType === 'buyer' ? 'text-green-600' : 'text-gray-700'}`}>
+              <p className={`font-bold text-xs sm:text-sm ${userType === 'buyer' ? 'text-green-600' : 'text-gray-700'}`}>
                 Comprador
               </p>
-              <p className="text-xs text-gray-400 mt-0.5 leading-tight">Encuentra productos increíbles y seguros</p>
+              <p className="text-xs text-gray-400 mt-0.5 leading-tight hidden sm:block">
+                Encuentra productos increíbles y seguros
+              </p>
               {userType === 'buyer' && (
                 <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs">✓</span>
@@ -124,10 +129,11 @@ export function LoginPage() {
         </div>
       </div>
 
-      {/* ── Sección inferior azul oscuro ── */}
-      <div className="flex-1 bg-blue-700 -mt-16 rounded-t-[2.5rem] px-6 pt-8 pb-10 relative">
-        {/* Features laterales (decorativo) */}
-        <div className="absolute right-4 top-8 flex flex-col gap-4 items-center opacity-80">
+      {/* ── Columna derecha / bottom (formulario azul oscuro) ── */}
+      <div className="flex-1 lg:w-1/2 xl:w-2/5 bg-blue-700 lg:rounded-none rounded-t-[2.5rem] lg:rounded-l-[2.5rem] px-6 sm:px-10 lg:px-12 py-8 lg:py-0 flex flex-col justify-center relative">
+
+        {/* Features laterales — solo desktop */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex-col gap-4 items-center hidden xl:flex">
           <div className="flex flex-col items-center gap-1">
             <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
               <ShieldCheck className="h-5 w-5 text-white" />
@@ -150,65 +156,80 @@ export function LoginPage() {
           </div>
         </div>
 
-        <h2 className="text-2xl font-black text-white mb-1">¡Bienvenido de nuevo!</h2>
-        <p className="text-blue-200 text-sm mb-6">Inicia sesión para continuar</p>
+        <div className="max-w-sm w-full mx-auto lg:mx-0">
+          <h2 className="text-2xl sm:text-3xl font-black text-white mb-1">¡Bienvenido de nuevo!</h2>
+          <p className="text-blue-200 text-sm mb-6">Inicia sesión para continuar</p>
 
-        <form onSubmit={handleSubmit} className="space-y-4 max-w-xs">
-          {/* Email */}
-          <div className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="Correo electrónico"
-              required
-              disabled={loading}
-              className="w-full pl-11 pr-4 py-3.5 bg-white rounded-2xl text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-300 transition"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email */}
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="Correo electrónico"
+                required
+                disabled={loading}
+                className="w-full pl-11 pr-4 py-3.5 bg-white rounded-2xl text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-300 transition"
+              />
+            </div>
 
-          {/* Password */}
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Contraseña"
-              required
-              disabled={loading}
-              className="w-full pl-11 pr-11 py-3.5 bg-white rounded-2xl text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-300 transition"
-            />
+            {/* Password */}
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Contraseña"
+                required
+                disabled={loading}
+                className="w-full pl-11 pr-11 py-3.5 bg-white rounded-2xl text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-300 transition"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            {/* Botón */}
             <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition shadow-lg shadow-blue-900/30"
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {loading
+                ? <><Loader2 className="h-4 w-4 animate-spin" />Ingresando...</>
+                : <><span>Iniciar sesión</span><ArrowRight className="h-4 w-4" /></>
+              }
             </button>
+          </form>
+
+          {/* Features — móvil y tablet */}
+          <div className="flex justify-center gap-6 mt-6 xl:hidden">
+            {[
+              { icon: <ShieldCheck className="h-4 w-4 text-white" />, label: 'Verificados' },
+              { icon: <Lock className="h-4 w-4 text-white" />, label: 'Pagos seguros' },
+              { icon: <span className="text-sm">👍</span>, label: 'Confiable' },
+            ].map(({ icon, label }) => (
+              <div key={label} className="flex flex-col items-center gap-1">
+                <div className="w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center">{icon}</div>
+                <span className="text-white text-xs">{label}</span>
+              </div>
+            ))}
           </div>
 
-          {/* Botón */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition shadow-lg shadow-blue-900/30"
-          >
-            {loading
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Ingresando...</>
-              : <><span>Iniciar sesión</span><ArrowRight className="h-4 w-4" /></>
-            }
-          </button>
-        </form>
-
-        {/* Registro */}
-        <p className="text-blue-200 text-sm mt-6">
-          ¿No tienes cuenta?{' '}
-          <Link to={`/register?type=${userType}`} className="text-white font-semibold hover:underline">
-            Regístrate ahora →
-          </Link>
-        </p>
+          <p className="text-blue-200 text-sm mt-6">
+            ¿No tienes cuenta?{' '}
+            <Link to={`/register?type=${userType}`} className="text-white font-semibold hover:underline">
+              Regístrate ahora →
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

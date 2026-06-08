@@ -1,14 +1,14 @@
 import { Link, Outlet, useNavigate } from 'react-router';
 import { useAuth } from './AuthContext';
 import { Button } from './ui/button';
-import { ShoppingBag, Package, LogOut, User, MessageCircle } from 'lucide-react';
+import { ShoppingBag, Package, LogOut, MessageCircle, User } from 'lucide-react';
 
 export function Layout() {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
@@ -22,14 +22,10 @@ export function Layout() {
               <span className="font-bold text-xl">MarketSecure</span>
             </Link>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
               {user ? (
                 <>
-                  <span className="text-sm text-gray-600">
-                    <User className="inline h-4 w-4 mr-1" />
-                    {user.name}
-                  </span>
-                  {user.type === 'seller' ? (
+                  {profile?.user_type === 'seller' ? (
                     <Link to="/seller/inventory">
                       <Button variant="outline" size="sm">
                         <Package className="h-4 w-4 mr-2" />
@@ -47,6 +43,19 @@ export function Layout() {
                   <Link to="/messages">
                     <Button variant="ghost" size="sm">
                       <MessageCircle className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  {/* Ícono de perfil */}
+                  <Link to="/profile">
+                    <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-semibold text-xs">
+                          {profile?.full_name?.charAt(0).toUpperCase() || <User className="h-3 w-3" />}
+                        </span>
+                      </div>
+                      <span className="text-sm text-gray-600 hidden sm:block">
+                        {profile?.full_name?.split(' ')[0] || 'Perfil'}
+                      </span>
                     </Button>
                   </Link>
                   <Button variant="ghost" size="sm" onClick={handleLogout}>
