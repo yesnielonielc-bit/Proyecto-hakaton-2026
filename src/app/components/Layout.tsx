@@ -2,7 +2,8 @@ import { Link, Outlet, useNavigate } from 'react-router';
 import { useAuth } from './AuthContext';
 import { Button } from './ui/button';
 import { ShoppingBag, Package, LogOut, MessageCircle, User } from 'lucide-react';
-
+import { Map } from 'lucide-react';
+import { ShoppingBag as OrderIcon } from 'lucide-react';
 export function Layout() {
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ export function Layout() {
                         Mi Inventario
                       </Button>
                     </Link>
+                    
                   ) : (
                     <Link to="/marketplace">
                       <Button variant="outline" size="sm">
@@ -45,6 +47,17 @@ export function Layout() {
                       <MessageCircle className="h-4 w-4" />
                     </Button>
                   </Link>
+                  <Link to="/orders">
+  <Button variant="ghost" size="sm">
+    <OrderIcon className="h-4 w-4" />
+  </Button>
+</Link>
+                  {/* Aquí va el mapa */}
+<Link to="/map">
+  <Button variant="ghost" size="sm">
+    <Map className="h-4 w-4" />
+  </Button>
+</Link>
                   {/* Ícono de perfil */}
                   <Link to="/profile">
                     <Button variant="ghost" size="sm" className="flex items-center gap-2">
@@ -62,11 +75,14 @@ export function Layout() {
                     <LogOut className="h-4 w-4" />
                   </Button>
                 </>
+                
               ) : (
                 <Link to="/login">
                   <Button size="sm">Iniciar Sesión</Button>
                 </Link>
+                
               )}
+   
             </div>
           </div>
         </div>

@@ -9,7 +9,7 @@ export function LandingPage() {
       <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-5xl font-bold mb-6">
-            Marketplace Seguro con Verificación Biométrica
+            MarketSecure con Verificación Biométrica
           </h1>
           <p className="text-xl mb-8 text-blue-100">
             Compra y vende con confianza. Cada vendedor verificado con tecnología antifraude.
@@ -22,7 +22,7 @@ export function LandingPage() {
             </Link>
             <Link to="/register?type=buyer">
               <Button size="lg" variant="outline" className="bg-white/10 border-white text-white hover:bg-white/20">
-                Explorar Marketplace
+                Explorar MarketSecure
               </Button>
             </Link>
           </div>

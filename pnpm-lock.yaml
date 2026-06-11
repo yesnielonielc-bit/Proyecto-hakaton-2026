@@ -107,6 +107,9 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.39.0
         version: 2.39.0
+      '@vis.gl/react-google-maps':
+        specifier: ^1.8.3
+        version: 1.8.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       canvas-confetti:
         specifier: 1.9.4
         version: 1.9.4
@@ -521,6 +524,9 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
+
+  '@googlemaps/js-api-loader@2.1.0':
+    resolution: {integrity: sha512-aZii781WEfncmJAFk1UPv6bdwT1mgRZzY8IWmpmx9mGAMCt97JZrXpn95LTsYinj7E4tC+LJv3FE8k2xRAsYgg==}
 
   '@isaacs/fs-minipass@4.0.1':
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
@@ -1594,6 +1600,9 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
+  '@types/google.maps@3.65.1':
+    resolution: {integrity: sha512-O9monmoXfyWsuyR4Wz3TZU26qai9y7jUV7DSRySluae6O5tQt3Obw5ETt0HKfNsjctnlF/yx/Tfn3WQNmKRXZA==}
+
   '@types/node@25.9.1':
     resolution: {integrity: sha512-xfrlY7UD5rMJk3ZVJP8BNzS28J36YJg+xp+LPXV1TdWxr8uMH5A860QNxYDGQe/ylDSgjxE52Q9VnO7p75tJxg==}
 
@@ -1615,6 +1624,12 @@ packages:
 
   '@types/react@19.2.14':
     resolution: {integrity: sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==}
+
+  '@vis.gl/react-google-maps@1.8.3':
+    resolution: {integrity: sha512-DW7nEuvOJ299DmdBnvGiUARrgS/+sTEO1iJgG9J8YaErZqLoq7S4TJ22f3EjJvR4dti4L4gft43JEK77nnKXDw==}
+    peerDependencies:
+      react: '>=16.8.0 || ^19.0 || ^19.0.0-rc'
+      react-dom: '>=16.8.0 || ^19.0 || ^19.0.0-rc'
 
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
@@ -2694,6 +2709,10 @@ snapshots:
 
   '@floating-ui/utils@0.2.11': {}
 
+  '@googlemaps/js-api-loader@2.1.0':
+    dependencies:
+      '@types/google.maps': 3.65.1
+
   '@isaacs/fs-minipass@4.0.1':
     dependencies:
       minipass: 7.1.3
@@ -3716,6 +3735,8 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
+  '@types/google.maps@3.65.1': {}
+
   '@types/node@25.9.1':
     dependencies:
       undici-types: 7.24.6
@@ -3735,6 +3756,14 @@ snapshots:
   '@types/react@19.2.14':
     dependencies:
       csstype: 3.2.3
+
+  '@vis.gl/react-google-maps@1.8.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@googlemaps/js-api-loader': 2.1.0
+      '@types/google.maps': 3.65.1
+      fast-deep-equal: 3.1.3
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@vitejs/plugin-react@4.7.0(vite@6.3.5(@types/node@25.9.1)(jiti@2.6.1)(lightningcss@1.30.1))':
     dependencies:

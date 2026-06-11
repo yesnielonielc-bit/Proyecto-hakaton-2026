@@ -11,7 +11,9 @@ import { MessagesPage } from './pages/MessagesPage';
 import { Toaster } from './components/ui/sonner';
 import { Loader2 } from 'lucide-react';
 import { ProfilePage } from './pages/ProfilePage';
- 
+import { MapPage } from './pages/MapPage';
+import { OrdersPage } from './pages/OrdersPage';
+
 function ProtectedRoute({ children, type }: { children: React.ReactNode; type?: 'seller' | 'buyer' }) {
   const { user, profile, loading } = useAuth();
  
@@ -45,7 +47,9 @@ export default function App() {
             <Route index element={<LandingPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
+           <Route path="map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
             <Route path="verify-identity" element={<VerifyIdentityPage />} />
+            <Route path="orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
             <Route
               path="seller/inventory"
               element={
