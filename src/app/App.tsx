@@ -13,7 +13,9 @@ import { Loader2 } from 'lucide-react';
 import { ProfilePage } from './pages/ProfilePage';
 import { MapPage } from './pages/MapPage';
 import { OrdersPage } from './pages/OrdersPage';
-
+import { SellerReportsPage } from './pages/Sellerreportspage';
+import { SellerCustomersPage } from './pages/SellerCustomersPage';
+import { SellerSettingsPage } from './pages/SellerSettingsPage';
 function ProtectedRoute({ children, type }: { children: React.ReactNode; type?: 'seller' | 'buyer' }) {
   const { user, profile, loading } = useAuth();
  
@@ -50,6 +52,14 @@ export default function App() {
            <Route path="map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
             <Route path="verify-identity" element={<VerifyIdentityPage />} />
             <Route path="orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+            <Route path="seller/reports" element={<ProtectedRoute type="seller"><SellerReportsPage /></ProtectedRoute>} />
+            <Route path="seller/customers" element={<ProtectedRoute type="seller"><SellerCustomersPage /></ProtectedRoute>} />
+            <Route path="seller/settings" element={<ProtectedRoute type="seller"><SellerSettingsPage /></ProtectedRoute>} />
+           <Route path="marketplace" element={
+  <ProtectedRoute>
+    <MarketplacePage />
+  </ProtectedRoute>
+} />
             <Route
               path="seller/inventory"
               element={
