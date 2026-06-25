@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { Search, Star, MapPin, ShoppingCart, Heart, Shield, MessageCircle, Loader2 } from 'lucide-react';
+import { Search, Star, MapPin, ShoppingCart, Heart, Shield, MessageCircle, Loader2, Calendar, Briefcase, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '../components/AuthContext';
@@ -13,6 +12,7 @@ import { CheckoutDialog } from '../components/CheckoutDialog';
 import { ChatDialog } from '../components/ChatDialog';
 import { DeliveryMap } from '../components/DeliveryMap';
 import { ReviewDialog } from '../components/ReviewDialog';
+import { BookingDialog } from '../components/BookingDialog';
 
 interface Product {
   id: string;
@@ -28,6 +28,8 @@ interface Product {
   description: string;
   view_count: number;
   created_at: string;
+  listing_type: 'product' | 'service';
+  duration_minutes: number | null;
   product_images: { url: string; sort_order: number }[];
   profiles: {
     full_name: string;
@@ -43,8 +45,10 @@ export function MarketplacePage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [listingFilter, setListingFilter] = useState<'all' | 'product' | 'service'>('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
+  const [bookingService, setBookingService] = useState<Product | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatUser, setChatUser] = useState<{ id: string; name: string } | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -66,7 +70,7 @@ export function MarketplacePage() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      toast.error('Error al cargar productos');
+      toast.error('Error al cargar el contenido');
       console.error(error);
     } else {
       setProducts(data || []);
@@ -114,16 +118,34 @@ export function MarketplacePage() {
     setChatOpen(true);
   };
 
+  const handleAction = (product: Product) => {
+    if (!user) { toast.error('Inicia sesión para continuar'); return; }
+    if (product.seller_id === user.id) { toast.error('No puedes comprar tu propio listado'); return; }
+    if (product.listing_type === 'service') {
+      setBookingService(product);
+    } else {
+      setCheckoutProduct(product);
+    }
+  };
+
   const filteredProducts = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
-    return matchSearch && matchCat;
+    const matchListing = listingFilter === 'all' || p.listing_type === listingFilter;
+    return matchSearch && matchCat && matchListing;
   });
 
   const getImage = (product: Product) => {
     const imgs = product.product_images?.sort((a, b) => a.sort_order - b.sort_order);
     return imgs?.[0]?.url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600';
+  };
+
+  const formatDuration = (minutes: number | null) => {
+    if (!minutes) return '';
+    if (minutes >= 1440) return 'Todo el día';
+    if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60 ? minutes % 60 + 'min' : ''}`.trim();
+    return `${minutes} min`;
   };
 
   if (loading) return (
@@ -137,14 +159,36 @@ export function MarketplacePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Marketplace</h1>
-          <p className="text-gray-600">Descubre productos de vendedores verificados</p>
+          <p className="text-gray-600">Descubre productos y servicios de vendedores verificados</p>
+        </div>
+
+        {/* Filtro Producto / Servicio */}
+        <div className="flex gap-2 mb-4">
+          {[
+            { key: 'all', label: 'Todo', icon: null },
+            { key: 'product', label: 'Productos', icon: Package },
+            { key: 'service', label: 'Servicios', icon: Briefcase },
+          ].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setListingFilter(f.key as any)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                listingFilter === f.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border'
+              }`}
+            >
+              {f.icon && <f.icon className="h-3.5 w-3.5" />}
+              {f.label}
+            </button>
+          ))}
         </div>
 
         <div className="mb-6 flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
-              placeholder="Buscar productos..."
+              placeholder="Buscar productos o servicios..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -166,58 +210,72 @@ export function MarketplacePage() {
 
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16 text-gray-500">
-            <p className="text-lg">No se encontraron productos</p>
+            <p className="text-lg">No se encontró nada</p>
             <p className="text-sm mt-1">Intenta con otra búsqueda o categoría</p>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map(product => (
-              <Card
-                key={product.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => handleOpenProduct(product)}
-              >
-                <div className="relative">
-                  <img src={getImage(product)} alt={product.name} className="w-full h-48 object-cover" />
-                  <button
-                    className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-100"
-                    onClick={(e) => toggleFavorite(e, product.id)}
-                  >
-                    <Heart className={`h-5 w-5 ${favorites.has(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
-                  </button>
-                  {product.profiles?.is_verified && (
-                    <div className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
-                      <Shield className="h-3 w-3" /> Verificado
+            {filteredProducts.map(product => {
+              const isService = product.listing_type === 'service';
+              return (
+                <Card
+                  key={product.id}
+                  className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => handleOpenProduct(product)}
+                >
+                  <div className="relative">
+                    <img src={getImage(product)} alt={product.name} className="w-full h-48 object-cover" />
+                    <button
+                      className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-100"
+                      onClick={(e) => toggleFavorite(e, product.id)}
+                    >
+                      <Heart className={`h-5 w-5 ${favorites.has(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+                    </button>
+                    <div className="absolute top-2 left-2 flex gap-1.5">
+                      {isService && (
+                        <div className="bg-purple-600 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
+                          <Briefcase className="h-3 w-3" /> Servicio
+                        </div>
+                      )}
+                      {product.profiles?.is_verified && (
+                        <div className="bg-blue-600 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
+                          <Shield className="h-3 w-3" /> Verificado
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-lg">{product.name}</h3>
-                    <Badge variant="secondary">{product.category}</Badge>
                   </div>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
-                  <div className="flex items-center gap-2 mb-2 text-sm text-gray-600">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span>{product.profiles?.rating?.toFixed(1) || '0.0'}</span>
-                    <span className="text-gray-400">({product.profiles?.review_count || 0})</span>
-                    {product.city && <><span>•</span><MapPin className="h-4 w-4" /><span>{product.city}</span></>}
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold text-lg">{product.name}</h3>
+                      <Badge variant="secondary">{product.category}</Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
+                    <div className="flex items-center gap-2 mb-2 text-sm text-gray-600">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span>{product.profiles?.rating?.toFixed(1) || '0.0'}</span>
+                      <span className="text-gray-400">({product.profiles?.review_count || 0})</span>
+                      {product.city && <><span>•</span><MapPin className="h-4 w-4" /><span>{product.city}</span></>}
+                      {isService && <><span>•</span><Calendar className="h-4 w-4" /><span>{formatDuration(product.duration_minutes)}</span></>}
+                    </div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm text-gray-600">{product.profiles?.full_name}</span>
+                      <span className="text-2xl font-bold text-blue-600">${product.price}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" onClick={(e) => { e.stopPropagation(); handleContactSeller(product); }}>
+                        <MessageCircle className="h-4 w-4 mr-1" /> Chat
+                      </Button>
+                      <Button onClick={(e) => { e.stopPropagation(); handleAction(product); }}>
+                        {isService
+                          ? <><Calendar className="h-4 w-4 mr-1" /> Reservar</>
+                          : <><ShoppingCart className="h-4 w-4 mr-1" /> Comprar</>
+                        }
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-gray-600">{product.profiles?.full_name}</span>
-                    <span className="text-2xl font-bold text-blue-600">${product.price}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" onClick={(e) => { e.stopPropagation(); handleContactSeller(product); }}>
-                      <MessageCircle className="h-4 w-4 mr-1" /> Chat
-                    </Button>
-                    <Button onClick={(e) => { e.stopPropagation(); setCheckoutProduct(product); }}>
-                      <ShoppingCart className="h-4 w-4 mr-1" /> Comprar
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
@@ -232,18 +290,30 @@ export function MarketplacePage() {
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <img src={getImage(selectedProduct)} alt={selectedProduct.name} className="w-full rounded-lg" />
-                {selectedProduct.address && (
+                {selectedProduct.listing_type === 'product' && selectedProduct.address && (
                   <DeliveryMap
                     sellerAddress={`${selectedProduct.address}, ${selectedProduct.city}`}
                     buyerAddress="Tu ubicación"
                   />
                 )}
+                {selectedProduct.listing_type === 'service' && selectedProduct.address && (
+                  <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-2 text-sm text-gray-600">
+                    <MapPin className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    {selectedProduct.address}, {selectedProduct.city}
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
-                <Badge variant="secondary">{selectedProduct.category}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{selectedProduct.category}</Badge>
+                  {selectedProduct.listing_type === 'service' && (
+                    <Badge variant="outline" className="gap-1">
+                      <Calendar className="h-3 w-3" /> {formatDuration(selectedProduct.duration_minutes)}
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-gray-600">{selectedProduct.description}</p>
 
-                {/* Rating clickeable → abre reseñas */}
                 <button
                   onClick={() => setReviewSeller({
                     id: selectedProduct.seller_id,
@@ -272,12 +342,21 @@ export function MarketplacePage() {
                 </div>
                 <div className="border-t pt-4">
                   <p className="text-3xl font-bold text-blue-600 mb-4">${selectedProduct.price}</p>
-                  <Badge variant="outline" className="mb-4">Stock: {selectedProduct.stock} disponibles</Badge>
+                  {selectedProduct.listing_type === 'product' ? (
+                    <Badge variant="outline" className="mb-4">Stock: {selectedProduct.stock} disponibles</Badge>
+                  ) : (
+                    <Badge variant="outline" className="mb-4 gap-1">
+                      <Calendar className="h-3 w-3" /> Reserva tu cita
+                    </Badge>
+                  )}
                   <Button
-                    onClick={() => { setSelectedProduct(null); setCheckoutProduct(selectedProduct); }}
+                    onClick={() => { setSelectedProduct(null); handleAction(selectedProduct); }}
                     className="w-full" size="lg"
                   >
-                    <ShoppingCart className="h-5 w-5 mr-2" /> Comprar Ahora
+                    {selectedProduct.listing_type === 'service'
+                      ? <><Calendar className="h-5 w-5 mr-2" /> Reservar Cita</>
+                      : <><ShoppingCart className="h-5 w-5 mr-2" /> Comprar Ahora</>
+                    }
                   </Button>
                 </div>
               </div>
@@ -287,25 +366,38 @@ export function MarketplacePage() {
       )}
 
       {checkoutProduct && (
-  <CheckoutDialog
-    open={!!checkoutProduct}
-    onClose={() => setCheckoutProduct(null)}
-    product={{
-      id: checkoutProduct.id,
-      name: checkoutProduct.name,
-      price: checkoutProduct.price,
-      seller: checkoutProduct.profiles?.full_name,
-      sellerId: checkoutProduct.seller_id
-    }}
-  />
-)}
-      
+        <CheckoutDialog
+          open={!!checkoutProduct}
+          onClose={() => setCheckoutProduct(null)}
+          product={{
+            id: checkoutProduct.id,
+            name: checkoutProduct.name,
+            price: checkoutProduct.price,
+            seller: checkoutProduct.profiles?.full_name,
+            sellerId: checkoutProduct.seller_id
+          }}
+        />
+      )}
+
+      {bookingService && (
+        <BookingDialog
+          open={!!bookingService}
+          onClose={() => setBookingService(null)}
+          service={{
+            id: bookingService.id,
+            name: bookingService.name,
+            price: bookingService.price,
+            seller_id: bookingService.seller_id,
+            seller_name: bookingService.profiles?.full_name,
+            duration_minutes: bookingService.duration_minutes || 60,
+          }}
+        />
+      )}
 
       {chatOpen && chatUser && (
         <ChatDialog open={chatOpen} onClose={() => setChatOpen(false)} otherUserId={chatUser.id} otherUserName={chatUser.name} />
       )}
 
-      {/* Dialog de reseñas */}
       {reviewSeller && (
         <ReviewDialog
           open={!!reviewSeller}

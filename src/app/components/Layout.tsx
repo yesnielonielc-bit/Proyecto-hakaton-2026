@@ -2,6 +2,7 @@ import { Link, Outlet, useNavigate } from 'react-router';
 import { useAuth } from './AuthContext';
 import { Button } from './ui/button';
 import { ShoppingBag, Package, LogOut, MessageCircle, Map, ShoppingCart } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 export function Layout() {
   const { user, profile, logout } = useAuth();
@@ -25,7 +26,6 @@ export function Layout() {
             <div className="flex items-center space-x-2">
               {user ? (
                 <>
-                  {/* Vendedor ve ambos botones */}
                   {profile?.user_type === 'seller' && (
                     <Link to="/seller/inventory">
                       <Button variant="outline" size="sm">
@@ -35,7 +35,6 @@ export function Layout() {
                     </Link>
                   )}
 
-                  {/* Todos ven Marketplace */}
                   <Link to="/marketplace">
                     <Button variant="outline" size="sm">
                       <ShoppingBag className="h-4 w-4 mr-2" />
@@ -61,7 +60,9 @@ export function Layout() {
                     </Button>
                   </Link>
 
-                  {/* Perfil */}
+                  {/* Campanita de notificaciones en tiempo real */}
+                  <NotificationBell />
+
                   <Link to="/profile">
                     <Button variant="ghost" size="sm" className="flex items-center gap-2">
                       <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">

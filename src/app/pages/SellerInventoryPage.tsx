@@ -17,6 +17,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { ImageUploader } from '../components/ImageUploader';
 import { AvailabilityManager } from '../components/AvailabilityManager';
+import { NotificationBell } from '../components/NotificationBell';
+
 
 interface ProductImage { id: string; url: string; sort_order: number; }
 interface Product {
@@ -173,10 +175,7 @@ export function SellerInventoryPage() {
                 Mi Disponibilidad
               </Button>
             )}
-            <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full" />
-            </button>
+            <NotificationBell />
             <NavLink to="/marketplace" className="text-sm text-blue-600 font-medium px-4 py-2 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
               Ver Marketplace
             </NavLink>
