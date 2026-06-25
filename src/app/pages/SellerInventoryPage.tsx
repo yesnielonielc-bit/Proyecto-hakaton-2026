@@ -9,12 +9,14 @@ import { Badge } from '../components/ui/badge';
 import {
   Plus, Package, TrendingUp, DollarSign, Eye, Edit, Trash2, Loader2,
   LayoutDashboard, ShoppingBag, Users, MessageCircle, BarChart2,
-  Settings, Bell, ChevronDown, LogOut, ShoppingCart, Menu, Pause, Play
+  Settings, Bell, ChevronDown, LogOut, ShoppingCart, Menu, Pause, Play,
+  Calendar, Briefcase
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { ImageUploader } from '../components/ImageUploader';
+import { AvailabilityManager } from '../components/AvailabilityManager';
 
 interface ProductImage { id: string; url: string; sort_order: number; }
 interface Product {
@@ -30,6 +32,8 @@ interface Product {
   address: string;
   view_count: number;
   sales_count: number;
+  listing_type: 'product' | 'service';
+  duration_minutes: number | null;
   product_images: ProductImage[];
 }
 
@@ -52,6 +56,7 @@ export function SellerInventoryPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showAvailability, setShowAvailability] = useState(false);
 
   const fetchProducts = async () => {
     if (!user) return;
@@ -83,9 +88,13 @@ export function SellerInventoryPage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  const totalValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
+  // Solo cuenta valor de inventario sobre productos físicos (los servicios no tienen "stock" real)
+  const totalValue = products
+    .filter(p => p.listing_type === 'product')
+    .reduce((sum, p) => sum + (p.price * p.stock), 0);
   const totalSales = products.reduce((sum, p) => sum + (p.sales_count || 0), 0);
   const totalViews = products.reduce((sum, p) => sum + (p.view_count || 0), 0);
+  const hasServices = products.some(p => p.listing_type === 'service');
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('products').update({ status: 'deleted' }).eq('id', id);
@@ -157,6 +166,13 @@ export function SellerInventoryPage() {
             <Menu className="h-5 w-5 text-gray-600" />
           </button>
           <div className="flex items-center gap-3">
+            {/* Botón de disponibilidad — visible solo si tiene al menos un servicio */}
+            {hasServices && (
+              <Button variant="outline" size="sm" onClick={() => setShowAvailability(true)}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Mi Disponibilidad
+              </Button>
+            )}
             <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
               <Bell className="h-5 w-5 text-gray-600" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full" />
@@ -177,7 +193,7 @@ export function SellerInventoryPage() {
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">Mi Inventario</h1>
-                  <p className="text-gray-500 text-sm mt-0.5">Gestiona tus productos y ventas</p>
+                  <p className="text-gray-500 text-sm mt-0.5">Gestiona tus productos y servicios</p>
                 </div>
                 <AddProductDialog sellerId={user?.id || ''} onAdded={fetchProducts} />
               </div>
@@ -186,9 +202,9 @@ export function SellerInventoryPage() {
                 <Card className="p-5 border-0 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-500 mb-1">Total Productos</p>
+                      <p className="text-xs text-gray-500 mb-1">Total Listados</p>
                       <p className="text-2xl font-bold text-gray-900">{products.length}</p>
-                      <p className="text-xs text-gray-400 mt-1">Productos registrados</p>
+                      <p className="text-xs text-gray-400 mt-1">Productos y servicios</p>
                     </div>
                     <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
                       <Package className="h-6 w-6 text-blue-500" />
@@ -200,7 +216,7 @@ export function SellerInventoryPage() {
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Valor Inventario</p>
                       <p className="text-2xl font-bold text-gray-900">${totalValue.toFixed(2)}</p>
-                      <p className="text-xs text-gray-400 mt-1">Valor total en inventario</p>
+                      <p className="text-xs text-gray-400 mt-1">Solo productos físicos</p>
                     </div>
                     <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center">
                       <DollarSign className="h-6 w-6 text-green-500" />
@@ -224,7 +240,7 @@ export function SellerInventoryPage() {
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Vistas Totales</p>
                       <p className="text-2xl font-bold text-gray-900">{totalViews}</p>
-                      <p className="text-xs text-gray-400 mt-1">Visitas a productos</p>
+                      <p className="text-xs text-gray-400 mt-1">Visitas a tus listados</p>
                     </div>
                     <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center">
                       <Eye className="h-6 w-6 text-orange-500" />
@@ -235,14 +251,14 @@ export function SellerInventoryPage() {
 
               <Card className="border-0 shadow-sm">
                 <div className="p-6">
-                  <h2 className="text-base font-semibold text-gray-900 mb-4">Productos en Inventario</h2>
+                  <h2 className="text-base font-semibold text-gray-900 mb-4">Productos y Servicios</h2>
                   {products.length === 0 ? (
                     <div className="text-center py-16 text-gray-400">
                       <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <Package className="h-8 w-8 text-blue-300" />
                       </div>
-                      <p className="font-medium text-gray-500">Aún no tienes productos</p>
-                      <p className="text-sm mt-1">¡Agrega el primero y comienza a vender!</p>
+                      <p className="font-medium text-gray-500">Aún no tienes nada publicado</p>
+                      <p className="text-sm mt-1">¡Agrega tu primer producto o servicio!</p>
                       <AddProductDialog sellerId={user?.id || ''} onAdded={fetchProducts} />
                     </div>
                   ) : (
@@ -250,10 +266,11 @@ export function SellerInventoryPage() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gray-100">
-                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Producto</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Listado</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Tipo</th>
                             <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Categoría</th>
                             <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Precio</th>
-                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Stock</th>
+                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Stock/Duración</th>
                             <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
                             <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Vistas</th>
                             <th className="text-left py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Acciones</th>
@@ -268,10 +285,25 @@ export function SellerInventoryPage() {
                                   <span className="font-medium text-sm text-gray-800">{product.name}</span>
                                 </div>
                               </td>
+                              <td className="py-3 px-4">
+                                {product.listing_type === 'service' ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-purple-50 text-purple-700">
+                                    <Briefcase className="h-3 w-3" /> Servicio
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-700">
+                                    <Package className="h-3 w-3" /> Producto
+                                  </span>
+                                )}
+                              </td>
                               <td className="py-3 px-4"><Badge variant="secondary" className="text-xs">{product.category}</Badge></td>
                               <td className="py-3 px-4 font-semibold text-sm text-gray-800">${product.price}</td>
                               <td className="py-3 px-4">
-                                <Badge variant={product.stock < 5 ? 'destructive' : 'default'} className="text-xs">{product.stock} uds.</Badge>
+                                {product.listing_type === 'service' ? (
+                                  <span className="text-sm text-gray-500">{product.duration_minutes} min</span>
+                                ) : (
+                                  <Badge variant={product.stock < 5 ? 'destructive' : 'default'} className="text-xs">{product.stock} uds.</Badge>
+                                )}
                               </td>
                               <td className="py-3 px-4">
                                 <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${product.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -286,7 +318,7 @@ export function SellerInventoryPage() {
                               </td>
                               <td className="py-3 px-4">
                                 <div className="flex gap-1">
-                                  <Button variant="ghost" size="sm" onClick={() => setEditingProduct(product)} title="Editar producto" className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600">
+                                  <Button variant="ghost" size="sm" onClick={() => setEditingProduct(product)} title="Editar" className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600">
                                     <Edit className="h-3.5 w-3.5" />
                                   </Button>
                                   <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(product)} title={product.status === 'active' ? 'Pausar' : 'Activar'} className="h-8 w-8 p-0 hover:bg-yellow-50 hover:text-yellow-600">
@@ -317,6 +349,14 @@ export function SellerInventoryPage() {
           onSaved={() => { setEditingProduct(null); fetchProducts(); }}
         />
       )}
+
+      {showAvailability && user && (
+        <AvailabilityManager
+          open={showAvailability}
+          onClose={() => setShowAvailability(false)}
+          sellerId={user.id}
+        />
+      )}
     </div>
   );
 }
@@ -325,31 +365,48 @@ function AddProductDialog({ sellerId, onAdded }: { sellerId: string; onAdded: ()
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<{ url: string }[]>([]);
+  const [listingType, setListingType] = useState<'product' | 'service'>('product');
   const [formData, setFormData] = useState({
     name: '', category: '', price: '', stock: '',
-    description: '', condition: 'good', address: '', city: ''
+    description: '', condition: 'good', address: '', city: '', duration: '60'
   });
   const update = (k: string, v: string) => setFormData(p => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const price = parseFloat(formData.price);
-    const stock = parseInt(formData.stock);
     if (isNaN(price) || price <= 0) { toast.error('El precio debe ser mayor a 0'); return; }
-    if (isNaN(stock) || stock < 0) { toast.error('El stock no puede ser negativo'); return; }
+
+    if (listingType === 'product') {
+      const stock = parseInt(formData.stock);
+      if (isNaN(stock) || stock < 0) { toast.error('El stock no puede ser negativo'); return; }
+    } else {
+      const duration = parseInt(formData.duration);
+      if (isNaN(duration) || duration <= 0) { toast.error('La duración debe ser mayor a 0'); return; }
+    }
 
     setLoading(true);
     const { data: product, error } = await supabase
       .from('products')
       .insert({
-        seller_id: sellerId, name: formData.name, category: formData.category,
-        price, stock, description: formData.description, condition: formData.condition,
-        address: formData.address, city: formData.city, status: 'active',
+        seller_id: sellerId,
+        name: formData.name,
+        category: formData.category,
+        price,
+        // Los servicios no manejan stock real — se ponen 999 para que siempre se muestren disponibles
+        stock: listingType === 'service' ? 999 : parseInt(formData.stock),
+        description: formData.description,
+        condition: formData.condition,
+        address: formData.address,
+        city: formData.city,
+        status: 'active',
+        listing_type: listingType,
+        duration_minutes: listingType === 'service' ? parseInt(formData.duration) : null,
       })
       .select()
       .single();
 
-    if (error) { toast.error('Error al crear producto'); setLoading(false); return; }
+    if (error) { toast.error('Error al crear el listado'); setLoading(false); return; }
 
     if (images.length > 0 && product) {
       await supabase.from('product_images').insert(
@@ -357,9 +414,10 @@ function AddProductDialog({ sellerId, onAdded }: { sellerId: string; onAdded: ()
       );
     }
 
-    toast.success('Producto agregado exitosamente');
-    setFormData({ name: '', category: '', price: '', stock: '', description: '', condition: 'good', address: '', city: '' });
+    toast.success(listingType === 'service' ? 'Servicio agregado exitosamente' : 'Producto agregado exitosamente');
+    setFormData({ name: '', category: '', price: '', stock: '', description: '', condition: 'good', address: '', city: '', duration: '60' });
     setImages([]);
+    setListingType('product');
     setOpen(false);
     onAdded();
     setLoading(false);
@@ -369,68 +427,152 @@ function AddProductDialog({ sellerId, onAdded }: { sellerId: string; onAdded: ()
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="mr-2 h-4 w-4" />Agregar Producto
+          <Plus className="mr-2 h-4 w-4" />Agregar
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Nuevo Producto</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Nuevo Listado</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Selector Producto / Servicio */}
           <div>
-            <Label>Fotos del Producto</Label>
+            <Label>¿Qué quieres publicar?</Label>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setListingType('product')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  listingType === 'product' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Package className={`h-6 w-6 ${listingType === 'product' ? 'text-blue-600' : 'text-gray-400'}`} />
+                <span className={`text-sm font-medium ${listingType === 'product' ? 'text-blue-600' : 'text-gray-600'}`}>Producto</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setListingType('service')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  listingType === 'service' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Briefcase className={`h-6 w-6 ${listingType === 'service' ? 'text-purple-600' : 'text-gray-400'}`} />
+                <span className={`text-sm font-medium ${listingType === 'service' ? 'text-purple-600' : 'text-gray-600'}`}>Servicio</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <Label>Fotos {listingType === 'service' ? 'del Servicio' : 'del Producto'}</Label>
             <ImageUploader userId={sellerId} images={images} onImagesChange={setImages} maxImages={5} />
           </div>
           <div>
-            <Label>Nombre del Producto</Label>
-            <Input value={formData.name} onChange={e => update('name', e.target.value)} placeholder="Laptop Dell XPS 13" required />
+            <Label>Nombre {listingType === 'service' ? 'del Servicio' : 'del Producto'}</Label>
+            <Input
+              value={formData.name}
+              onChange={e => update('name', e.target.value)}
+              placeholder={listingType === 'service' ? 'Manicure y pedicure' : 'Laptop Dell XPS 13'}
+              required
+            />
           </div>
           <div>
             <Label>Descripción</Label>
-            <Input value={formData.description} onChange={e => update('description', e.target.value)} placeholder="Describe tu producto..." />
+            <Input value={formData.description} onChange={e => update('description', e.target.value)} placeholder="Describe qué ofreces..." />
           </div>
           <div>
             <Label>Categoría</Label>
             <select value={formData.category} onChange={e => update('category', e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm" required>
               <option value="">Seleccionar categoría</option>
-              <option value="Electrónica">Electrónica</option>
-              <option value="Ropa">Ropa</option>
-              <option value="Hogar">Hogar</option>
-              <option value="Deportes">Deportes</option>
-              <option value="Fotografía">Fotografía</option>
-              <option value="Gaming">Gaming</option>
-              <option value="Audio">Audio</option>
+              {listingType === 'product' ? (
+                <>
+                  <option value="Electrónica">Electrónica</option>
+                  <option value="Ropa">Ropa</option>
+                  <option value="Hogar">Hogar</option>
+                  <option value="Deportes">Deportes</option>
+                  <option value="Fotografía">Fotografía</option>
+                  <option value="Gaming">Gaming</option>
+                  <option value="Audio">Audio</option>
+                </>
+              ) : (
+                <>
+                  <option value="Belleza">Belleza y Cuidado Personal</option>
+                  <option value="Hospedaje">Hospedaje y Alojamiento</option>
+                  <option value="Salud">Salud y Bienestar</option>
+                  <option value="Hogar">Servicios para el Hogar</option>
+                  <option value="Eventos">Eventos y Celebraciones</option>
+                  <option value="Educación">Clases y Educación</option>
+                  <option value="Profesional">Servicios Profesionales</option>
+                </>
+              )}
             </select>
           </div>
-          <div>
-            <Label>Condición</Label>
-            <select value={formData.condition} onChange={e => update('condition', e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm">
-              <option value="new">Nuevo</option>
-              <option value="like_new">Como nuevo</option>
-              <option value="good">Buen estado</option>
-              <option value="fair">Regular</option>
-            </select>
-          </div>
+
+          {listingType === 'product' ? (
+            <div>
+              <Label>Condición</Label>
+              <select value={formData.condition} onChange={e => update('condition', e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm">
+                <option value="new">Nuevo</option>
+                <option value="like_new">Como nuevo</option>
+                <option value="good">Buen estado</option>
+                <option value="fair">Regular</option>
+              </select>
+            </div>
+          ) : (
+            <div>
+              <Label>Duración de la cita</Label>
+              <select value={formData.duration} onChange={e => update('duration', e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm">
+                <option value="15">15 minutos</option>
+                <option value="30">30 minutos</option>
+                <option value="45">45 minutos</option>
+                <option value="60">1 hora</option>
+                <option value="90">1 hora 30 min</option>
+                <option value="120">2 horas</option>
+                <option value="180">3 horas</option>
+                <option value="1440">Todo el día (24h) — ej. hospedaje</option>
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Precio ($)</Label>
               <Input type="number" step="0.01" min="0.01" value={formData.price} onChange={e => update('price', e.target.value)} placeholder="99.99" required />
             </div>
-            <div>
-              <Label>Stock</Label>
-              <Input type="number" min="0" value={formData.stock} onChange={e => update('stock', e.target.value)} placeholder="10" required />
-            </div>
+            {listingType === 'product' ? (
+              <div>
+                <Label>Stock</Label>
+                <Input type="number" min="0" value={formData.stock} onChange={e => update('stock', e.target.value)} placeholder="10" required />
+              </div>
+            ) : (
+              <div className="flex items-end">
+                <p className="text-xs text-gray-400 pb-2">
+                  Las citas se reservan según tu disponibilidad
+                </p>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Ciudad</Label>
-              <Input value={formData.city} onChange={e => update('city', e.target.value)} placeholder="San José" />
+              <Input value={formData.city} onChange={e => update('city', e.target.value)} placeholder="Managua" />
             </div>
             <div>
               <Label>Dirección</Label>
               <Input value={formData.address} onChange={e => update('address', e.target.value)} placeholder="Calle 5" />
             </div>
           </div>
+
+          {listingType === 'service' && (
+            <div className="bg-purple-50 rounded-lg p-3 text-xs text-purple-700 flex items-start gap-2">
+              <Calendar className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>
+                Recuerda configurar tu disponibilidad (días y horarios) desde el botón
+                "Mi Disponibilidad" arriba, para que los clientes puedan reservar.
+              </span>
+            </div>
+          )}
+
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : 'Agregar Producto'}
+            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : `Agregar ${listingType === 'service' ? 'Servicio' : 'Producto'}`}
           </Button>
         </form>
       </DialogContent>
@@ -443,25 +585,21 @@ function EditProductDialog({ product, onClose, onSaved }: {
 }) {
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<ProductImage[]>(product.product_images || []);
+  const isService = product.listing_type === 'service';
   const [formData, setFormData] = useState({
     name: product.name, category: product.category, price: String(product.price),
     stock: String(product.stock), description: product.description || '',
     condition: product.condition, address: product.address || '', city: product.city || '',
+    duration: String(product.duration_minutes || 60),
   });
   const update = (k: string, v: string) => setFormData(p => ({ ...p, [k]: v }));
 
-  // Sincroniza el cambio de imágenes con la base de datos
   const handleImagesChange = async (newImages: { id?: string; url: string }[]) => {
-    const currentIds = images.map(i => i.id);
     const newIds = newImages.map(i => i.id).filter(Boolean) as string[];
-
-    // Imágenes eliminadas
     const removed = images.filter(img => !newIds.includes(img.id));
     for (const r of removed) {
       await supabase.from('product_images').delete().eq('id', r.id);
     }
-
-    // Imágenes nuevas (sin id)
     const added = newImages.filter(img => !img.id);
     let insertedImages: ProductImage[] = [];
     if (added.length > 0) {
@@ -470,29 +608,35 @@ function EditProductDialog({ product, onClose, onSaved }: {
       ).select();
       insertedImages = data || [];
     }
-
     setImages([...images.filter(img => newIds.includes(img.id)), ...insertedImages]);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const price = parseFloat(formData.price);
-    const stock = parseInt(formData.stock);
     if (isNaN(price) || price <= 0) { toast.error('El precio debe ser mayor a 0'); return; }
-    if (isNaN(stock) || stock < 0) { toast.error('El stock no puede ser negativo'); return; }
+
+    const updateData: any = {
+      name: formData.name, category: formData.category, price,
+      description: formData.description, address: formData.address, city: formData.city,
+    };
+
+    if (isService) {
+      const duration = parseInt(formData.duration);
+      if (isNaN(duration) || duration <= 0) { toast.error('La duración debe ser mayor a 0'); return; }
+      updateData.duration_minutes = duration;
+    } else {
+      const stock = parseInt(formData.stock);
+      if (isNaN(stock) || stock < 0) { toast.error('El stock no puede ser negativo'); return; }
+      updateData.stock = stock;
+      updateData.condition = formData.condition;
+    }
 
     setLoading(true);
-    const { error } = await supabase
-      .from('products')
-      .update({
-        name: formData.name, category: formData.category, price, stock,
-        description: formData.description, condition: formData.condition,
-        address: formData.address, city: formData.city,
-      })
-      .eq('id', product.id);
+    const { error } = await supabase.from('products').update(updateData).eq('id', product.id);
 
     if (error) { toast.error('Error al guardar cambios'); setLoading(false); return; }
-    toast.success('Producto actualizado');
+    toast.success('Cambios guardados');
     onSaved();
     setLoading(false);
   };
@@ -500,10 +644,12 @@ function EditProductDialog({ product, onClose, onSaved }: {
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Editar Producto</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Editar {isService ? 'Servicio' : 'Producto'}</DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <Label>Fotos del Producto</Label>
+            <Label>Fotos</Label>
             <ImageUploader
               userId={product.id}
               images={images.map(img => ({ id: img.id, url: img.url }))}
@@ -512,7 +658,7 @@ function EditProductDialog({ product, onClose, onSaved }: {
             />
           </div>
           <div>
-            <Label>Nombre del Producto</Label>
+            <Label>Nombre</Label>
             <Input value={formData.name} onChange={e => update('name', e.target.value)} required />
           </div>
           <div>
@@ -522,33 +668,67 @@ function EditProductDialog({ product, onClose, onSaved }: {
           <div>
             <Label>Categoría</Label>
             <select value={formData.category} onChange={e => update('category', e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm" required>
-              <option value="Electrónica">Electrónica</option>
-              <option value="Ropa">Ropa</option>
-              <option value="Hogar">Hogar</option>
-              <option value="Deportes">Deportes</option>
-              <option value="Fotografía">Fotografía</option>
-              <option value="Gaming">Gaming</option>
-              <option value="Audio">Audio</option>
+              {isService ? (
+                <>
+                  <option value="Belleza">Belleza y Cuidado Personal</option>
+                  <option value="Hospedaje">Hospedaje y Alojamiento</option>
+                  <option value="Salud">Salud y Bienestar</option>
+                  <option value="Hogar">Servicios para el Hogar</option>
+                  <option value="Eventos">Eventos y Celebraciones</option>
+                  <option value="Educación">Clases y Educación</option>
+                  <option value="Profesional">Servicios Profesionales</option>
+                </>
+              ) : (
+                <>
+                  <option value="Electrónica">Electrónica</option>
+                  <option value="Ropa">Ropa</option>
+                  <option value="Hogar">Hogar</option>
+                  <option value="Deportes">Deportes</option>
+                  <option value="Fotografía">Fotografía</option>
+                  <option value="Gaming">Gaming</option>
+                  <option value="Audio">Audio</option>
+                </>
+              )}
             </select>
           </div>
-          <div>
-            <Label>Condición</Label>
-            <select value={formData.condition} onChange={e => update('condition', e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm">
-              <option value="new">Nuevo</option>
-              <option value="like_new">Como nuevo</option>
-              <option value="good">Buen estado</option>
-              <option value="fair">Regular</option>
-            </select>
-          </div>
+
+          {isService ? (
+            <div>
+              <Label>Duración de la cita</Label>
+              <select value={formData.duration} onChange={e => update('duration', e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm">
+                <option value="15">15 minutos</option>
+                <option value="30">30 minutos</option>
+                <option value="45">45 minutos</option>
+                <option value="60">1 hora</option>
+                <option value="90">1 hora 30 min</option>
+                <option value="120">2 horas</option>
+                <option value="180">3 horas</option>
+                <option value="1440">Todo el día (24h)</option>
+              </select>
+            </div>
+          ) : (
+            <div>
+              <Label>Condición</Label>
+              <select value={formData.condition} onChange={e => update('condition', e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm">
+                <option value="new">Nuevo</option>
+                <option value="like_new">Como nuevo</option>
+                <option value="good">Buen estado</option>
+                <option value="fair">Regular</option>
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Precio ($)</Label>
               <Input type="number" step="0.01" min="0.01" value={formData.price} onChange={e => update('price', e.target.value)} required />
             </div>
-            <div>
-              <Label>Stock</Label>
-              <Input type="number" min="0" value={formData.stock} onChange={e => update('stock', e.target.value)} required />
-            </div>
+            {!isService && (
+              <div>
+                <Label>Stock</Label>
+                <Input type="number" min="0" value={formData.stock} onChange={e => update('stock', e.target.value)} required />
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
