@@ -287,12 +287,19 @@ export function MarketplacePage() {
       )}
 
       {checkoutProduct && (
-        <CheckoutDialog
-          open={!!checkoutProduct}
-          onClose={() => setCheckoutProduct(null)}
-          product={{ id: checkoutProduct.id, name: checkoutProduct.name, price: checkoutProduct.price, seller: checkoutProduct.profiles?.full_name }}
-        />
-      )}
+  <CheckoutDialog
+    open={!!checkoutProduct}
+    onClose={() => setCheckoutProduct(null)}
+    product={{
+      id: checkoutProduct.id,
+      name: checkoutProduct.name,
+      price: checkoutProduct.price,
+      seller: checkoutProduct.profiles?.full_name,
+      sellerId: checkoutProduct.seller_id
+    }}
+  />
+)}
+      
 
       {chatOpen && chatUser && (
         <ChatDialog open={chatOpen} onClose={() => setChatOpen(false)} otherUserId={chatUser.id} otherUserName={chatUser.name} />
