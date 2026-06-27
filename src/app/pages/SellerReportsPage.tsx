@@ -8,6 +8,7 @@ import {
   Users, MessageCircle, Settings, Bell, ChevronDown,
   LogOut, ShoppingCart, Menu, Loader2, Eye, Star, LayoutDashboard
 } from 'lucide-react';
+import { PythonInsights } from '../components/PythonInsights';
 
 const navItems = [
   { to: '/seller/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -70,7 +71,7 @@ export function SellerReportsPage() {
 
     // Categorías
     const catMap = new Map<string, { count: number; revenue: number }>();
-    orders.forEach(o => {
+    orders.forEach(onafterprint => {
       o.order_items?.forEach((item: any) => {
         const cat = item.products?.category || 'Sin categoría';
         const existing = catMap.get(cat) || { count: 0, revenue: 0 };
@@ -294,6 +295,8 @@ export function SellerReportsPage() {
                   </div>
                 )}
               </Card>
+              {/* Insights de Python */}
+              {user && <div className="mt-6"><PythonInsights sellerId={user.id} /></div>}
             </>
           )}
         </main>
