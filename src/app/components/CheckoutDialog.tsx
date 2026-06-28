@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
-import { CreditCard, Lock, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
+import { CreditCard, Lock, CheckCircle2, Loader2, ShieldCheck, FileText, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
@@ -15,9 +15,11 @@ interface CheckoutDialogProps {
     name: string;
     price: number;
     seller: string;
-    sellerId: string; // ← necesario: antes faltaba y se usaba mal
+    sellerId: string;
   };
 }
+
+const PYTHON_API_URL = 'http://localhost:8000';
 
 export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) {
   const { user, profile } = useAuth();
@@ -25,8 +27,8 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
   const [loading, setLoading] = useState(false);
   const [orderId, setOrderId] = useState('');
   const [transactionId, setTransactionId] = useState('');
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
-  // Datos de tarjeta — solo para la simulación visual del demo
   const [card, setCard] = useState({ number: '', expiry: '', cvc: '', name: '' });
 
   const handlePayment = async () => {
@@ -46,7 +48,6 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
 
     setLoading(true);
     try {
-      // 1. Crear la orden — buyer es el usuario actual, seller es el vendedor real del producto
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -62,7 +63,6 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
 
       if (orderError) throw orderError;
 
-      // 2. Crear item de la orden
       const { error: itemError } = await supabase.from('order_items').insert({
         order_id: order.id,
         product_id: product.id,
@@ -71,12 +71,9 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
       });
       if (itemError) throw itemError;
 
-      // 3. Simular procesamiento de pago (sin pasarela real — Nicaragua aún no soportada por Stripe)
-      // Simulamos una pequeña espera para que se sienta real
       await new Promise(resolve => setTimeout(resolve, 1200));
       const fakeTransactionId = `DEMO-${Date.now().toString(36).toUpperCase()}`;
 
-      // 4. Guardar el "pago" en la BD, marcado claramente como simulado
       const { error: paymentError } = await supabase.from('payments').insert({
         order_id: order.id,
         stripe_payment_id: fakeTransactionId,
@@ -87,7 +84,6 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
       });
       if (paymentError) throw paymentError;
 
-      // 5. Reducir el stock del producto
       const { data: currentProduct } = await supabase
         .from('products')
         .select('stock, sales_count')
@@ -104,7 +100,6 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
           .eq('id', product.id);
       }
 
-      // 6. Actualizar orden a pagada
       await supabase.from('orders').update({ status: 'paid' }).eq('id', order.id);
 
       setOrderId(order.id);
@@ -117,6 +112,29 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
       toast.error('Error al procesar el pago: ' + (error.message || ''));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Descarga directa de la factura desde la pantalla de confirmación
+  const handleDownloadInvoice = async () => {
+    setDownloadingInvoice(true);
+    try {
+      const res = await fetch(`${PYTHON_API_URL}/api/orders/${orderId}/invoice`);
+      if (!res.ok) throw new Error('No se pudo generar la factura');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `factura-${orderId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Factura descargada');
+    } catch {
+      toast.error('No se pudo descargar la factura en este momento. Podrás encontrarla más tarde en "Mis Pedidos".');
+    } finally {
+      setDownloadingInvoice(false);
     }
   };
 
@@ -151,7 +169,6 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
               <p className="text-2xl font-bold text-blue-600">${product.price}</p>
             </div>
 
-            {/* Aviso de modo demo — transparencia para el usuario */}
             <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 p-3 rounded-lg">
               <ShieldCheck className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <span>
@@ -237,6 +254,21 @@ export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) 
               <p className="text-xs text-gray-500 mt-2 mb-1">ID de Transacción:</p>
               <p className="font-mono text-xs break-all text-gray-700">{transactionId}</p>
             </div>
+
+            {/* Acceso directo a la factura */}
+            <Button
+              onClick={handleDownloadInvoice}
+              disabled={downloadingInvoice}
+              variant="outline"
+              className="w-full mb-2 gap-2"
+            >
+              {downloadingInvoice
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <FileText className="h-4 w-4" />
+              }
+              Descargar Factura
+            </Button>
+
             <Button onClick={handleComplete} className="w-full">
               Continuar Comprando
             </Button>
