@@ -6,7 +6,8 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import {
   ShoppingBag, Package, Loader2, ChevronDown, ChevronUp, Clock,
-  CheckCircle2, Truck, XCircle, RefreshCw, Calendar, CalendarCheck, CalendarX
+  CheckCircle2, Truck, XCircle, RefreshCw, Calendar, CalendarCheck, CalendarX,
+  Download, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -56,6 +57,8 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; icon: 
   refunded:  { label: 'Reembolsado', color: 'bg-gray-100 text-gray-700',     icon: RefreshCw },
 };
 
+const PYTHON_API_URL = 'http://localhost:8000';
+
 const BOOKING_STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending:   { label: 'Por confirmar', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
   confirmed: { label: 'Confirmada',    color: 'bg-green-100 text-green-700',   icon: CalendarCheck },
@@ -72,6 +75,7 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusTab, setStatusTab] = useState<'all' | 'pending' | 'completed'>('all');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const isSeller = profile?.user_type === 'seller';
 
@@ -127,6 +131,28 @@ export function OrdersPage() {
     if (error) { toast.error('Error al actualizar estado'); return; }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     toast.success('Estado actualizado');
+  };
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    setDownloadingId(orderId);
+    try {
+      const res = await fetch(`${PYTHON_API_URL}/api/orders/${orderId}/invoice`);
+      if (!res.ok) throw new Error('No se pudo generar la factura');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `factura-${orderId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Factura descargada');
+    } catch (err) {
+      toast.error('No se pudo descargar la factura. Verifica que el servicio esté disponible.');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const handleUpdateBookingStatus = async (bookingId: string, newStatus: string) => {
@@ -287,6 +313,24 @@ export function OrdersPage() {
                         {order.delivery_address && (
                           <p className="text-xs text-gray-500 mb-3">📍 {order.delivery_address}, {order.delivery_city}</p>
                         )}
+
+                        {/* Botón de descarga de factura — visible una vez pagada */}
+                        {['paid', 'confirmed', 'shipped', 'delivered'].includes(order.status) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadInvoice(order.id)}
+                            disabled={downloadingId === order.id}
+                            className="text-xs mb-2 gap-1.5"
+                          >
+                            {downloadingId === order.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <FileText className="h-3.5 w-3.5" />
+                            }
+                            Descargar Factura
+                          </Button>
+                        )}
+
                         {isSeller && (
                           <div className="flex gap-2 flex-wrap">
                             {order.status === 'paid' && (

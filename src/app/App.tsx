@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react';
 import { ProfilePage } from './pages/ProfilePage';
 import { MapPage } from './pages/MapPage';
 import { OrdersPage } from './pages/OrdersPage';
-import { SellerReportsPage } from './pages/Sellerreportspage';
+import { SellerReportsPage } from './pages/SellerReportsPage';
 import { SellerCustomersPage } from './pages/SellerCustomersPage';
 import { SellerSettingsPage } from './pages/SellerSettingsPage';
 function ProtectedRoute({ children, type }: { children: React.ReactNode; type?: 'seller' | 'buyer' }) {
