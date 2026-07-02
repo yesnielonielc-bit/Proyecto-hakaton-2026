@@ -13,7 +13,7 @@ interface PythonInsightsProps {
   sellerId: string;
 }
 
-const PYTHON_API_URL = 'http://localhost:8000';
+const PYTHON_API_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
 export function PythonInsights({ sellerId }: PythonInsightsProps) {
   const [report, setReport] = useState<PythonReport | null>(null);
@@ -64,8 +64,8 @@ export function PythonInsights({ sellerId }: PythonInsightsProps) {
         <div className="flex items-start gap-2 bg-amber-50 text-amber-700 text-sm p-3 rounded-xl">
           <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <span>
-            No se pudo conectar al servicio de análisis. Asegúrate de que el backend
-            Python esté corriendo en <code className="bg-amber-100 px-1 rounded">localhost:8000</code>.
+            No se pudo conectar al servicio de análisis. Verifica que el backend
+            Python esté disponible.
           </span>
         </div>
       ) : report ? (
