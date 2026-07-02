@@ -19,7 +19,7 @@ interface CheckoutDialogProps {
   };
 }
 
-const PYTHON_API_URL = 'http://localhost:8000';
+const PYTHON_API_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
 export function CheckoutDialog({ open, onClose, product }: CheckoutDialogProps) {
   const { user, profile } = useAuth();

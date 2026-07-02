@@ -57,7 +57,7 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; icon: 
   refunded:  { label: 'Reembolsado', color: 'bg-gray-100 text-gray-700',     icon: RefreshCw },
 };
 
-const PYTHON_API_URL = 'http://localhost:8000';
+const PYTHON_API_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
 const BOOKING_STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending:   { label: 'Por confirmar', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
